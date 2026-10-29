@@ -1,0 +1,21 @@
+node_modules/
+.env
+.DS_Store
+
+.env.*
+!.env.example
+*.pem
+*.key
+*.log
+coverage/
+dist/
+build/
+playwright-report/
+test-results/
+
+# SQLite contains responses; never commit databases or journals.
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+data/

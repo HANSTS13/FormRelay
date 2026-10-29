@@ -1,0 +1,42 @@
+﻿<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FormRelay</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+<header class="header"><div class="brand"><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#0d6b61"/><path d="M9 10h13M9 16h9M9 22h5m7-5 4 4-4 4m-5-4h8" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><div><strong>FormRelay</strong><span>Answers, together.</span></div></div><span class="version">v0.4</span></header>
+<div class="site"><span id="connection-dot" class="dot"></span><div><strong id="website">Connecting to this page</strong><small id="connection">Checking your active tab...</small></div><button id="refresh" class="icon-button" aria-label="Refresh page status" title="Refresh page status">&#8635;</button></div>
+<nav class="tabs" role="tablist" aria-label="FormRelay sections"><button id="tab-fields" role="tab" aria-selected="true" aria-controls="panel-fields" data-tab="fields">Fields <span id="tab-count" class="count">0</span></button><button id="tab-requests" role="tab" aria-selected="false" tabindex="-1" aria-controls="panel-requests" data-tab="requests">Requests <span id="request-dot" hidden class="request-dot"></span></button><button id="tab-settings" role="tab" aria-selected="false" tabindex="-1" aria-controls="panel-settings" data-tab="settings">Settings</button></nav>
+<div id="message" class="notice" role="status" aria-live="polite" hidden></div>
+<main>
+<section id="panel-fields" role="tabpanel" aria-labelledby="tab-fields">
+  <div class="section-heading"><div><h1>Your selected questions</h1><p>Share only what you need help with.</p></div><span id="selection-count" class="pill">0 selected</span></div>
+  <div class="selection-actions"><button id="select" class="button primary">&#43; Start selection</button><button id="finish" class="button secondary" disabled>Finish selection</button></div>
+  <div id="empty-fields" class="empty-state"><div class="empty-icon" aria-hidden="true">&#9633;</div><h2>A little help goes a long way.</h2><p>Start selection, close this popup, then click unanswered questions on the page.</p><span class="hint">Your selections stay when you close this popup.</span></div>
+  <ul id="fields" class="field-list" aria-label="Selected questions"></ul>
+  <div class="list-tools"><button id="clear" class="text-button" disabled>Clear selection</button><span id="selection-hint" class="muted">Up to 20 questions</span></div>
+  <button id="create" class="button primary wide" disabled>Create request <span aria-hidden="true">&#8599;</span></button>
+  <button id="check" class="button quiet wide">Check compatibility / results</button><div id="compatibility" class="compatibility" aria-live="polite"></div>
+  <button id="new-fields" class="text-button new-request" hidden>Start a new request</button>
+</section>
+<section id="panel-requests" role="tabpanel" aria-labelledby="tab-requests" hidden>
+  <div class="section-heading"><div><h1>Collaborate from any tab</h1><p>Keep the original page open.</p></div></div>
+  <div id="empty-request" class="empty-state"><div class="empty-icon" aria-hidden="true">&#8599;</div><h2>No request yet</h2><p>Select a few questions in Fields, then create a link for your collaborator.</p><button id="go-fields" class="button secondary">Choose fields</button></div>
+  <article id="request-card" class="request-card" hidden>
+    <div class="request-top"><span class="eyebrow">CURRENT REQUEST</span><span id="request-status" class="pill">Waiting</span></div>
+    <h2 id="request-title">Ready to share</h2><p id="request-description" class="muted"></p>
+    <div class="qr-frame"><img id="qr" alt="Scan to answer the requested questions" width="160" height="160"></div>
+    <label class="label" for="link">Recipient link</label><div class="copy-row"><input id="link" readonly type="url"><button id="copy" class="button secondary">Copy</button></div>
+    <p id="expiry" class="hint"></p><p id="request-origin" class="hint"></p><ul id="requested-fields" class="compact-list" aria-label="Requested questions"></ul>
+    <div id="results" class="results"></div>
+    <button id="undo" class="button quiet wide" disabled>Undo inserted values</button><button id="new-request" class="button primary wide">New request</button>
+    <p class="hint">Links expire automatically. Cancellation and revocation are not available.</p>
+  </article>
+</section>
+<section id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+  <div class="section-heading"><div><h1>Connection settings</h1><p>Local by default. Always in your control.</p></div></div>
+  <div class="settings-card"><label class="label" for="base">Backend URL</label><input id="base" type="url" value="http://localhost:3000" spellcheck="false"><p class="hint">Use localhost on this computer, including in Wi-Fi/LAN mode.</p>
+  <label class="label" for="accessKey">Access key <span class="muted">(LAN or online mode)</span></label><input id="accessKey" type="password" autocomplete="off" placeholder="Leave blank for the local two-tab demo"><p class="hint">Kept in this browser session. Never shared in the recipient link.</p>
+  <button id="test-connection" class="button secondary wide">Save &amp; test connection</button><p id="settings-status" role="status" class="hint"></p></div>
+  <div class="info-card"><strong>Built for careful collaboration</strong><p>Native text, email, phone, number, date, textarea, select, radio and checkbox controls. Check compatibility for details.</p><p>Some custom widgets, frames, protected fields and website behaviors are unsupported. Always review filled values.</p></div>
+  <div class="privacy-card"><strong>Your final click stays yours.</strong><p>FormRelay fills selected questions. You review and submit the original form yourself.</p><small>Hackathon prototype. Use fictional data only.</small></div>
+</section>
+</main><footer><span class="lock" aria-hidden="true">&#9671;</span> Only selected questions are shared.</footer>
+<script src="popup.js"></script></body></html>
