@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "FormRelay Demo",
-  "version": "0.1.0",
+  "name": "FormRelay",
+  "version": "0.4.0",
   "description": "Select fields and request answers from another device",
   "permissions": [
     "activeTab",
@@ -10,7 +10,8 @@
   ],
   "host_permissions": [
     "http://localhost:3000/*",
-    "https://*.onrender.com/*"
+    "https://*.onrender.com/*",
+    "http://localhost/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -19,6 +20,7 @@
     "default_popup": "popup.html"
   },
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:3000 https://*.onrender.com; img-src 'self' http://localhost:3000 https://*.onrender.com; base-uri 'none'"
-  }
+    "extension_pages": "default-src 'self'; script-src 'self'; object-src 'none'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* https://*.onrender.com; img-src 'self' http://localhost:* https://*.onrender.com; base-uri 'none'"
+  },
+  "minimum_chrome_version": "106"
 }

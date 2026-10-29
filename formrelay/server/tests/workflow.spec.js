@@ -37,7 +37,7 @@ test('two tabs: real content and recipient scripts using a simulated Chrome mess
  window.changes=[];window.submissions=0;
  document.addEventListener('input',e=>changes.push('input:'+e.target.id));document.addEventListener('change',e=>changes.push('change:'+e.target.id));
  document.querySelector('form').addEventListener('submit',()=>submissions++);
- window.chrome={storage:{local:{set:()=>{}}},runtime:{lastError:null,onMessage:{addListener:fn=>window.receive=fn},sendMessage:async(msg,cb)=>{const r=await fetch(msg.path,{headers:{Authorization:'Bearer '+msg.token}});cb({ok:r.ok,data:await r.json()})}}};
+ window.chrome={storage:{local:{set:()=>{}}},runtime:{lastError:null,onMessage:{addListener:fn=>window.receive=fn},sendMessage:async(msg,cb)=>{if(msg.action!=='FETCH'){cb({ok:true});return}const r=await fetch(msg.path,{headers:{Authorization:'Bearer '+msg.token}});cb({ok:r.ok,data:await r.json()})}}};
  });
  // Serve the simulated extension script from the same origin in this test only.
  // Keep the production page CSP enforced rather than allowing inline scripts.

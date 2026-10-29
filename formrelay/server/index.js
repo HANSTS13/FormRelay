@@ -4,16 +4,23 @@ const QRCode=require('qrcode');
 const path=require('path');
 const {rateLimit}=require('express-rate-limit');
 const {createStore}=require('./store');
+const {definitions,validateAnswers}=require('./fields');
 
 function createApp(env=process.env){
 const production=env.NODE_ENV==='production';
+const lanURL=env.LAN_BASE_URL?new URL(env.LAN_BASE_URL):null;
+if(lanURL){
+ const parts=lanURL.hostname.split('.').map(Number);
+ const privateIPv4=require('net').isIP(lanURL.hostname)===4&&(parts[0]===10||(parts[0]===172&&parts[1]>=16&&parts[1]<=31)||(parts[0]===192&&parts[1]===168));
+ if(production||lanURL.protocol!=='http:'||!privateIPv4||lanURL.username||lanURL.password||lanURL.search||lanURL.hash||lanURL.pathname!=='/'||lanURL.port!==String(env.PORT||3000))throw Error('LAN_BASE_URL is development-only and must be http://PRIVATE_WIFI_IPV4:PORT with no path or credentials');
+}
 const creationKey=env.CREATION_KEY||'';
 const configuredURL=env.PUBLIC_BASE_URL||env.RENDER_EXTERNAL_URL||'';
 const publicURL=configuredURL?new URL(configuredURL):null;
 if(publicURL&&(publicURL.username||publicURL.password||publicURL.search||publicURL.hash||publicURL.pathname!=='/'))throw Error('PUBLIC_BASE_URL must be an origin without a path or credentials');
 if(production&&(!publicURL||publicURL.protocol!=='https:'))throw Error('Production requires an HTTPS PUBLIC_BASE_URL or RENDER_EXTERNAL_URL');
 if(publicURL&&!['http:','https:'].includes(publicURL.protocol))throw Error('Invalid public URL protocol');
-if(production&&creationKey.length<32)throw Error('Production requires CREATION_KEY with at least 32 characters');
+if((production||lanURL)&&creationKey.length<32)throw Error('Production and LAN demos require CREATION_KEY with at least 32 characters');
 const store=createStore(env.DB_FILE||':memory:');
 const app=express();
 app.disable('x-powered-by');
@@ -30,14 +37,14 @@ app.use('/api',(req,res,next)=>{
  // Chrome extension fetches use explicit host_permissions.
  const origin=req.get('Origin');
  const expected=publicURL?.origin||req.protocol+'://'+req.get('host');
- if(origin&&origin!==expected&&!/^chrome-extension:\/\/[a-p]{32}$/.test(origin))return res.status(403).json({error:'Untrusted origin'});
+ if(origin&&origin!==expected&&origin!==lanURL?.origin&&!/^chrome-extension:\/\/[a-p]{32}$/.test(origin))return res.status(403).json({error:'Untrusted origin'});
  next();
 });
 const apiLimit=rateLimit({windowMs:60_000,limit:300,standardHeaders:'draft-8',legacyHeaders:false,message:{error:'Too many requests; wait a minute'}});
 const createLimit=rateLimit({windowMs:60*60_000,limit:20,standardHeaders:'draft-8',legacyHeaders:false,message:{error:'Request creation limit reached; try again later'}});
 app.use('/api',apiLimit);
 app.use(express.json({limit:'32kb',strict:true}));
-const requestURL=(req,id)=>(publicURL?.origin||req.protocol+'://'+req.get('host'))+'/r/'+id;
+const requestURL=(req,id)=>(lanURL?.origin||publicURL?.origin||req.protocol+'://'+req.get('host'))+'/r/'+id;
 function authorizeCreation(req,res,next){
  if(!creationKey)return next();
  const supplied=req.get('X-FormRelay-Key')||'';
@@ -57,16 +64,12 @@ app.get('/recipient.js',(req,res)=>res.sendFile(path.join(__dirname,'public','re
 app.post('/api/requests',createLimit,authorizeCreation,(req,res)=>{
   clean();
   if(store.count()>=1000)return res.status(503).json({error:'Demo capacity reached; try again after requests expire'});
-  const fields=req.body?.fields;
-  if(!Array.isArray(fields)||fields.length<1||fields.length>20)return res.status(400).json({error:'Select 1-20 fields'});
-  if(!fields.every(f=>f&&typeof f==='object'&&typeof f.key==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(f.key)&&!['__proto__','prototype','constructor'].includes(f.key)&&typeof f.label==='string'&&f.label.length>0&&f.label.length<=100&&['text','tel','email','number','date'].includes(f.type)))return res.status(400).json({error:'Unsupported fields'});
-  if(new Set(fields.map(f=>f.key)).size!==fields.length)return res.status(400).json({error:'Duplicate field keys'});
+  let fields;try{fields=definitions(req.body?.fields)}catch(error){return res.status(400).json({error:error.message})}
   const id=crypto.randomBytes(16).toString('hex');
   const ownerToken=crypto.randomBytes(32).toString('hex');
-  const definitions=fields.map(({key,label,type})=>({key,label,type}));
-  if(definitions.some(f=>/password|otp|one.time|verification|token|secret|credential|cvv|cvc|card|credit|debit|pin|aadhaar|aadhar|ssn/i.test(f.label)))return res.status(400).json({error:'Sensitive fields are not supported'});
-  store.create(id,{fields:definitions,ownerHash:crypto.createHash('sha256').update(ownerToken).digest('hex'),expires:Date.now()+TTL,answers:null});
-  res.status(201).json({id,ownerToken,url:requestURL(req,id),expiresInMinutes:30});
+  const expiresAt=Date.now()+TTL;
+  store.create(id,{fields,ownerHash:crypto.createHash('sha256').update(ownerToken).digest('hex'),expires:expiresAt,answers:null});
+  res.status(201).json({id,ownerToken,url:requestURL(req,id),expiresInMinutes:30,expiresAt});
 });
 function find(req,res){const r=store.get(req.params.id);if(!r){res.status(404).json({error:'Request expired or not found'});return null;}return r}
 function owner(req,res,r){const token=(req.get('Authorization')||'').replace(/^Bearer /,'');const hash=crypto.createHash('sha256').update(token).digest('hex');if(!token||hash.length!==r.ownerHash.length||!crypto.timingSafeEqual(Buffer.from(hash),Buffer.from(r.ownerHash))){res.status(403).json({error:'Access denied'});return false;}return true}
@@ -75,11 +78,7 @@ app.get('/api/requests/:id/fields',(req,res)=>{const r=find(req,res);if(r)res.js
 app.post('/api/requests/:id/answer',(req,res)=>{
  const r=find(req,res);if(!r)return;
  if(r.answers)return res.status(409).json({error:'Already submitted'});
- const incoming=req.body?.answers;
- if(!incoming||typeof incoming!=='object'||Array.isArray(incoming))return res.status(400).json({error:'Invalid answers'});
- if(Object.keys(incoming).length!==r.fields.length||Object.keys(incoming).some(key=>!r.fields.some(f=>f.key===key)))return res.status(400).json({error:'Unexpected answer fields'});
- const answers=Object.create(null);
- for(const f of r.fields){const v=incoming[f.key];if(typeof v!=='string'||v.length>500||!v.trim()||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v))return res.status(400).json({error:`Invalid answer for ${f.label}`});if(f.type==='email'&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))return res.status(400).json({error:'Invalid email'});if(f.type==='number'&&!Number.isFinite(Number(v)))return res.status(400).json({error:'Invalid number'});if(f.type==='tel'&&!/^[+()0-9 .-]{3,40}$/.test(v))return res.status(400).json({error:'Invalid phone'});if(f.type==='date'&&(!/^\d{4}-\d{2}-\d{2}$/.test(v)||!Number.isFinite(Date.parse(v))||new Date(v).toISOString().slice(0,10)!==v))return res.status(400).json({error:'Invalid date'});answers[f.key]=v;}
+ let answers;try{answers=validateAnswers(r.fields,req.body?.answers)}catch(error){return res.status(400).json({error:error.message})}
  if(!store.answer(req.params.id,answers))return res.status(409).json({error:'Already submitted or expired'});
  res.json({ok:true});
 });
@@ -92,8 +91,14 @@ app.use((err,req,res,next)=>{
 return {app,store,close(){clearInterval(cleanupTimer);store.close()}};
 }
 if(require.main===module){
+ if(!process.env.NODE_ENV)process.env.NODE_ENV='development';
  const instance=createApp();
- const server=instance.app.listen(process.env.PORT||3000,'0.0.0.0',()=>console.log('FormRelay server on '+(process.env.PORT||3000)));
+ const bindAddress=process.env.NODE_ENV==='production'||process.env.LAN_BASE_URL?'0.0.0.0':'127.0.0.1';
+ const server=instance.app.listen(process.env.PORT||3000,bindAddress,()=>{
+  console.log('FormRelay '+process.env.NODE_ENV+' server: http://localhost:'+(process.env.PORT||3000));
+  if(process.env.LAN_BASE_URL)console.log('LAN recipient links use '+new URL(process.env.LAN_BASE_URL).origin+' (same Wi-Fi; HTTP; fictional data only)');
+ });
+ server.on('error',error=>{instance.close();console.error(error.code==='EADDRINUSE'?'Port '+(process.env.PORT||3000)+' is already in use. Stop the previous FormRelay terminal with Ctrl+C.':error.message);process.exitCode=1});
  for(const signal of ['SIGTERM','SIGINT'])process.once(signal,()=>server.close(()=>{instance.close();process.exit(0)}));
 }
 module.exports={createApp};

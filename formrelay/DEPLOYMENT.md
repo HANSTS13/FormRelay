@@ -1,5 +1,7 @@
 # Deploy the prepared FormRelay implementation on Render
 
+The current hackathon plan uses [LOCAL_DEMO.md](LOCAL_DEMO.md). These production settings are preserved for possible future use. LAN_BASE_URL must be unset in production.
+
 These settings refer to the private GitHub repository HANSTS13/FormRelay, whose root contains both the preserved original server/ and the improved formrelay/server/. Choose formrelay/server, not server and not the local Windows path. Changes are local until you approve a commit/push; Render cannot deploy files that are only on your computer. No deployment or push has been performed.
 
 ## Exact service settings
@@ -76,8 +78,10 @@ Requests expire after 30 minutes, even after restart; expired rows are removed a
 
 ## Verification
 
-Latest local result: all 6 deployment/security/storage tests and all 3 Playwright tests passed (9 total, 0 failures). An isolated npm ci --omit=dev --offline install also served /health, /demo, and /demo.js with HTTP 200 without development dependencies. npm audit reported 0 vulnerabilities during installation. This result does not imply that the live deployment has been tested.
+Deployment preparation baseline (before the later native-form extensions): all 6 deployment/security/storage tests and all 3 Playwright tests passed (9 total, 0 failures). An isolated npm ci --omit=dev --offline install also served /health, /demo, and /demo.js with HTTP 200 without development dependencies. npm audit reported 0 vulnerabilities during installation. This result does not imply that the live deployment has been tested.
 
 From formrelay/server run npm.cmd install, then npm.cmd test. The suite runs deployment/security/storage tests and the existing browser tests. Deployment tests simulate HTTPS proxy headers locally; they do not prove Render's live TLS or mobile-network access. Browser tests use Edge and simulate Chrome messaging. Actual Chrome installation, browser permission prompts, live Render TLS, QR scanning, and the different-network walkthrough still require manual verification after deployment.
 
 Official references: [Render Web Services](https://render.com/docs/web-services), [environment variables](https://render.com/docs/environment-variables), [persistent disks](https://render.com/docs/disks), [free services](https://render.com/docs/free), [Chrome network requests](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests), [Chrome CSP](https://developer.chrome.com/docs/extensions/reference/manifest/content-security-policy), [Node SQLite](https://nodejs.org/download/release/latest-v24.x/docs/api/sqlite.html).
+
+Current native-form compatibility and test results are documented in [COMPATIBILITY.md](COMPATIBILITY.md).
