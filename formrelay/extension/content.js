@@ -6,7 +6,7 @@ const allowed=new Set(['text','tel','email','number','date']);
 function fieldOf(el){if(!(el instanceof HTMLInputElement))return null;if(!allowed.has(el.type)||el.disabled||el.readOnly||el.value.trim()||el.getClientRects().length===0||getComputedStyle(el).visibility==='hidden'||el.closest('[contenteditable="true"]'))return null;const name=el.getAttribute('name')||'';const id=el.id||'';const label=el.labels?.[0]?.textContent?.trim()||el.getAttribute('aria-label')||el.placeholder||name||id||'Unlabeled field';if(/token|secret|credential|password|otp|one.time|verification|cvv|cvc|card|credit|debit|pin|aadhaar|aadhar|ssn/i.test([label,name,id].join(' ')))return null;return {el,label:label.slice(0,100),type:el.type}}
 function findEl(key){return chosen.find(x=>x.key===key)?.el}
 function update(){chrome.storage.local.set({formrelaySelected:chosen.map(({key,label,type})=>({key,label,type}))})}
-function hover(e){const f=fieldOf(e.target);if(f)e.target.style.outline='2px dashed #5274fa'}
+function hover(e){const f=fieldOf(e.target);if(f&&!chosen.some(c=>c.el===e.target))e.target.style.outline='2px dashed #5274fa'}
 function unhover(e){const f=fieldOf(e.target);if(f&&!chosen.some(c=>c.el===e.target))e.target.style.outline=''}
 function block(e){e.preventDefault();e.stopImmediatePropagation()}
 function keyguard(e){if(e.key==='Enter')block(e)}

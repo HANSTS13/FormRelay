@@ -1,1 +1,1 @@
-module.exports={testDir:'./tests',workers:1,use:{baseURL:'http://localhost:3108',headless:true,channel:'msedge'},webServer:{command:'node index.js',port:3108,env:{PORT:'3108'},reuseExistingServer:false}};
+module.exports={testDir:'./tests',testMatch:'**/*.spec.js',workers:1,use:{baseURL:'http://localhost:3108',headless:true,channel:'msedge'},webServer:{command:'node index.js',port:3108,env:{PORT:'3108'},reuseExistingServer:false}};

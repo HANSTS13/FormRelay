@@ -1,6 +1,15 @@
 
 const {test,expect}=require('@playwright/test');
 const path=require('path');
+const fs=require('fs');
+test('Manifest V3 references existing extension files and required permissions',()=>{
+ const directory=path.join(__dirname,'../../extension');
+ const manifest=JSON.parse(fs.readFileSync(path.join(directory,'manifest.json'),'utf8'));
+ expect(manifest.manifest_version).toBe(3);
+ expect(manifest.permissions).toEqual(expect.arrayContaining(['activeTab','scripting','storage']));
+ expect(manifest.host_permissions).toContain('http://localhost:3000/*');
+ for(const file of [manifest.background.service_worker,manifest.action.default_popup,'content.js','popup.js'])expect(fs.existsSync(path.join(directory,file))).toBe(true);
+});
 test('health, demo, owner isolation and validation',async({request})=>{
  expect((await request.get('/health')).status()).toBe(200);
  expect((await request.get('/demo')).status()).toBe(200);
@@ -10,7 +19,9 @@ test('health, demo, owner isolation and validation',async({request})=>{
  expect(JSON.stringify(await (await request.get('/api/requests/'+r.id+'/fields')).json())).not.toContain('NEVER SHARE');
  expect((await request.get('/api/requests/'+r.id+'/status')).status()).toBe(403);
  expect((await request.get('/api/requests/'+r.id+'/status',{headers:{Authorization:'Bearer wrong'}})).status()).toBe(403);
- expect((await request.get('/api/requests/'+r.id+'/qr.png')).headers()['content-type']).toContain('image/png');
+ const qr=await request.get('/api/requests/'+r.id+'/qr.png');
+ expect(qr.status()).toBe(200);expect(qr.headers()['content-type']).toContain('image/png');
+ expect((await qr.body()).subarray(0,8).toString('hex')).toBe('89504e470d0a1a0a');
  expect((await request.post('/api/requests/'+r.id+'/answer',{data:{answers:{phone:'bad'}}})).status()).toBe(400);
  expect((await request.post('/api/requests/'+r.id+'/answer',{data:{answers:{phone:'555-0100',extra:'x'}}})).status()).toBe(400);
  expect((await request.post('/api/requests/'+r.id+'/answer',{data:{answers:{phone:'555-0100'}}})).status()).toBe(200);
@@ -20,6 +31,7 @@ test('health, demo, owner isolation and validation',async({request})=>{
  expect((await request.get('/api/requests/'+r.id+'/status',{headers:{Authorization:'Bearer '+r.ownerToken}})).status()).toBe(200);
 });
 test('two tabs: real content and recipient scripts using a simulated Chrome messaging bridge',async({page,context,request})=>{
+ let navigations=0;page.on('framenavigated',frame=>{if(frame===page.mainFrame())navigations++});
  await page.goto('/demo');
  await page.evaluate(()=>{
  window.changes=[];window.submissions=0;
@@ -27,10 +39,20 @@ test('two tabs: real content and recipient scripts using a simulated Chrome mess
  document.querySelector('form').addEventListener('submit',()=>submissions++);
  window.chrome={storage:{local:{set:()=>{}}},runtime:{lastError:null,onMessage:{addListener:fn=>window.receive=fn},sendMessage:async(msg,cb)=>{const r=await fetch(msg.path,{headers:{Authorization:'Bearer '+msg.token}});cb({ok:r.ok,data:await r.json()})}}};
  });
- await page.addScriptTag({path:path.join(__dirname,'../../extension/content.js')});
+ // Serve the simulated extension script from the same origin in this test only.
+ // Keep the production page CSP enforced rather than allowing inline scripts.
+ await page.route('**/__test/content.js',route=>route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(__dirname,'../../extension/content.js'),'utf8')}));
+ await page.addScriptTag({url:'/__test/content.js'});
  await page.evaluate(()=>receive({action:'START'},null,()=>{}));
  for(const id of ['guardian_name','guardian_job','guardian_phone'])await page.locator('#'+id).click();
- await page.locator('#guardian_job').click();await page.locator('#guardian_job').click();
+ await page.locator('#guardian_job').click();
+ expect(await page.evaluate(()=>new Promise(resolve=>receive({action:'GET_SELECTION'},null,r=>resolve(r.fields.length))))).toBe(2);
+ await page.locator('#guardian_job').click();
+ await page.locator('#guardian_name').hover();
+ await expect(page.locator('#guardian_name')).toHaveCSS('outline-style','solid');
+ await expect(page.locator('#guardian_name')).toHaveCSS('outline-color','rgb(21, 146, 96)');
+ await page.locator('#family_income').hover();
+ await expect(page.locator('#guardian_name')).toHaveCSS('outline-style','solid');
  await page.evaluate(()=>{document.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
  expect(await page.evaluate(()=>submissions)).toBe(0);
  const fields=await page.evaluate(()=>new Promise(resolve=>receive({action:'GET_SELECTION'},null,r=>resolve(r.fields))));expect(fields).toHaveLength(3);
@@ -42,6 +64,7 @@ test('two tabs: real content and recipient scripts using a simulated Chrome mess
  await expect(recipient.locator('#status')).toContainText('Submitted!');
  await expect(page.locator('#guardian_name')).toHaveValue('Morgan Example');await expect(page.locator('#guardian_job')).toHaveValue('Fictional Teacher');await expect(page.locator('#guardian_phone')).toHaveValue('555-0100');
  await expect(page.locator('#student_name')).toHaveValue('Demo Student');await expect(page.locator('#family_income')).toHaveValue('');
+ expect(navigations).toBe(1);
  expect(await page.evaluate(()=>changes.length)).toBe(6);expect(await page.evaluate(()=>submissions)).toBe(0);
  await expect(page.locator('#guardian_name')).toHaveCSS('background-color','rgb(216, 248, 230)');
 });

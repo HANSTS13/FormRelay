@@ -4,14 +4,16 @@
   "private": true,
   "scripts": {
     "start": "node index.js",
-    "test": "playwright test"
+    "test": "npm run test:deployment && playwright test",
+    "test:deployment": "node --test tests/deployment.test.cjs"
   },
   "dependencies": {
     "express": "^4.21.2",
+    "express-rate-limit": "^8.7.2",
     "qrcode": "^1.5.4"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24 <25"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1"

@@ -1,10 +1,10 @@
 # FormRelay MVP — hackathon prototype
 
-Controlled demo, **not** production software. Use fictional data only. It has no recipient authentication, persistent storage, production-grade encryption, or comprehensive field classification.
+Controlled demo, **not** production software. Use fictional data only. It has no recipient identity verification, application encryption at rest, or comprehensive field classification. Optional SQLite persistence and deployment safeguards are documented in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Run locally
 
-1. Install Node.js 20+ and Google Chrome.
+1. Install Node.js 24.x and Google Chrome.
 2. Open terminal in `server/` and run `npm install` then `npm start`.
 3. Open `http://localhost:3000/demo` in Chrome.
 4. In Chrome open `chrome://extensions`, turn on **Developer mode**, click **Load unpacked**, choose `extension/`.
@@ -15,14 +15,11 @@ Controlled demo, **not** production software. Use fictional data only. It has no
 
 ## Deploy on Render
 
-- Commit the whole project to GitHub (never commit credentials).
-- Render > New > Web Service > connect repo > **Root Directory** `server` > Runtime Node > Build `npm install` > Start `npm start` > Free instance.
-- Wait for the published HTTPS URL; confirm `/health` returns `{ "ok": true }`.
-- In extension popup enter that URL. For a real phone, visit link or scan QR.
+Use the exact settings and security/storage instructions in [DEPLOYMENT.md](DEPLOYMENT.md). The repository Root Directory is **formrelay/server**, Build Command **npm ci --omit=dev**, Start Command **npm start**. Production requires a private creation key entered in the extension. No deployment has been performed.
 
 ## Limitations / known safeguards
 
-- Uses in-memory requests (lost on restart), 30-minute expiry, 32 KB request limit, one response per request, random request identifiers and a separate secret for the requester to read answers.
+- Uses SQLite in memory by default (lost on restart); optional DB_FILE enables file-backed SQLite, 30-minute expiry, 32 KB request limit, one response per request, random request identifiers and a separate secret for the requester to read answers.
 - QR/link is a bearer capability: anyone holding it can submit. Never use sensitive or private information; expiry does not authenticate recipients.
 - Field selection supports simple text/email/tel/number/date `<input>` elements on the main page, not CAPTCHA, frames, select, textarea, credentials, complex reactive widgets, or arbitrary sites.
 - No AI is included; automation alone aligns with domain. Don't claim AI-based mapping exists.
@@ -48,12 +45,12 @@ Open http://localhost:3000/health and http://localhost:3000/demo. In Chrome open
 
 Run npm.cmd test from formrelay/server. Tests use installed Microsoft Edge in headless mode. To use installed Google Chrome instead, change channel in playwright.config.js from msedge to chrome.
 
-Two automated tests passed: backend health/demo, QR image generation, owner-token isolation (including a different request's token), malformed/sensitive definitions, stripping existing values from request metadata, invalid phone and extra answer rejection, one response only; and a two-tab browser test using real content and recipient scripts with a simulated Chrome messaging bridge. That browser test verifies click deselection, selection-mode submit prevention, three guardian values, unchanged unselected values, input/change events, and review highlighting. Actual Chrome extension loading, popup/service-worker integration, phone access, expiry timing, and production HTTPS have not been tested.
+Earlier baseline verification (before deployment preparation): backend health/demo, QR image generation, owner-token isolation (including a different request's token), malformed/sensitive definitions, stripping existing values from request metadata, invalid phone and extra answer rejection, one response only; and a two-tab browser test using real content and recipient scripts with a simulated Chrome messaging bridge. That browser test verifies click deselection, selection-mode submit prevention, three guardian values, unchanged unselected values, input/change events, and review highlighting. Actual Chrome extension loading, popup/service-worker integration, phone access, expiry timing, and production HTTPS have not been tested.
 
 Fixes include blocking submit and Enter during selection, excluding populated/invisible inputs and common credential labels, reading selection from the current tab, copying only field definitions on the backend, and validating typed answers. Mappings use references to the selected DOM elements in the original tab; disconnected/replaced elements are skipped. Mappings and pending requests do not survive page reloads, navigation, or browser restarts. Complex reactive forms remain unsupported.
 
 Deployment: use Root Directory formrelay/server when deploying this imported implementation. Set TRUST_PROXY=1 only behind a trusted single reverse proxy such as Render, so links and QR codes use HTTPS. The extension permits localhost:3000 and HTTPS subdomains of onrender.com only. Other deployment hosts need explicit manifest and URL-validation changes. Phone access needs a deployed HTTPS backend; localhost on a phone points to the phone itself.
 
-Security limits: fictional data only. Recipient links grant access to field definitions and allow one submission; there is no recipient identity verification, rate limiting, durable database, abuse protection, request revocation, or production monitoring. Requests expire after 30 minutes and disappear on server restart. Owner tokens protect answer reads but remain in memory while the tab is open. Heuristic sensitive-field detection is incomplete; users must avoid sensitive data. Do not use on real confidential applications. No production deployment was performed.
+Security and storage review: see [DEPLOYMENT.md](DEPLOYMENT.md) for current safeguards, required production configuration, persistence options, and remaining limitations.
 
-Dependencies: Express and qrcode at runtime; @playwright/test for development only. npm audit reported zero vulnerabilities at installation. npm.cmd avoids PowerShell's npm.ps1 execution-policy restriction without changing system settings. If your network certificate requires Windows trust, set $env:NODE_USE_SYSTEM_CA='1' before npm.cmd install; never disable TLS verification.
+Dependencies: Express, qrcode, and express-rate-limit at runtime; built-in node:sqlite requires Node 24.x; @playwright/test for development only. npm audit reported zero vulnerabilities at installation. npm.cmd avoids PowerShell's npm.ps1 execution-policy restriction without changing system settings. If your network certificate requires Windows trust, set $env:NODE_USE_SYSTEM_CA='1' before npm.cmd install; never disable TLS verification.

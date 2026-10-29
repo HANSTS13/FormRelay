@@ -1,0 +1,24 @@
+# Optional Render Blueprint. Creates a free, ephemeral demo; no paid disk.
+services:
+  - type: web
+    name: formrelay
+    runtime: node
+    branch: feature/formrelay-setup
+    rootDir: formrelay/server
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    plan: free
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      - key: CREATION_KEY
+        generateValue: true
+# RENDER_EXTERNAL_URL is provided by Render. No PUBLIC_BASE_URL is needed.
+# Optional durable mode: choose a paid service and attach a disk at /var/data,
+# then add DB_FILE=/var/data/formrelay.sqlite. Keep a single service instance.
