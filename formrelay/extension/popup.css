@@ -3,3 +3,5 @@
 body{height:600px;max-height:100vh;display:flex;flex-direction:column}.header,.site,.tabs,.notice,footer{flex-shrink:0}main{flex:1;min-height:0;max-height:none}
 
 #panel-requests .section-heading{display:none}.qr-frame{padding:8px;margin:12px 0}.qr-frame img{width:128px;height:128px}.request-top{margin-bottom:10px}
+
+#request-picker{font:inherit;width:100%;padding:9px;border:1px solid #ccd8da;border-radius:7px;margin:0 0 12px;background:white;color:#263d45}#request-picker:focus-visible{outline:3px solid #328bdf;outline-offset:3px}

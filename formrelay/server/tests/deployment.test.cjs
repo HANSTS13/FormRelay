@@ -79,6 +79,27 @@ test('extension service worker polls the configured HTTPS backend with only the 
  assert.equal(listener(msg,{id:'another-extension'},()=>{}),undefined);
 });
 
+for(const scenario of [
+ {status:400,error:'Unsupported fields',match:/older FormRelay backend/},
+ {status:401,error:'Creation key required',match:/access key/},
+ {status:403,error:'Origin denied',match:/access policy/},
+ {status:404,error:'Not found',match:/Backend URL/},
+ {status:429,error:'Too many requests',retryAfter:'120',match:/Retry after 120 seconds/},
+ {status:500,error:'Server error',match:/backend terminal/},
+ {status:404,nonJSON:true,match:/unexpected page/},
+ {status:0,network:true,match:/Backend unavailable/}
+]) test('request creation preserves actionable failure details: '+JSON.stringify(scenario),async()=>{
+ const session={formrelayAccess:{origin:environment.PUBLIC_BASE_URL,key}};let listener,failed,sent;
+ const definitions=[{key:'notes',label:'Fictional notes',type:'textarea'},{key:'choice',label:'Fictional choice',type:'select',options:[{value:'choice_0',label:'Example'}]}];
+ const context={URL,Error,Date,chrome:{runtime:{id:'trusted',onMessage:{addListener:fn=>listener=fn}},storage:{session:{get:async name=>({[name]:session[name]}),set:async data=>Object.assign(session,data)}},tabs:{get:async()=>({id:1,url:'https://original.example/form'}),sendMessage:async(id,msg)=>{if(msg.action==='PREPARE_REQUEST')return {ok:true,documentToken:'doc',fields:definitions};if(msg.action==='TRACK')assert.fail('Failed creation must not start tracking');if(msg.action==='CREATE_FAILED')failed=msg;return {ok:true}}}},fetch:async(url,options)=>{sent={url,options};if(scenario.network)throw Error('Connection refused');return {ok:false,status:scenario.status,headers:{get:()=>scenario.retryAfter},json:async()=>{if(scenario.nonJSON)throw Error('HTML response');return {error:scenario.error}}}}};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../extension/background.js'),'utf8'),context);
+ const reply=await new Promise(resolve=>listener({action:'CREATE_REQUEST',tabId:1,base:environment.PUBLIC_BASE_URL},{id:'trusted'},resolve));
+ assert.equal(reply.ok,false);assert.equal(reply.status,scenario.status);assert.match(reply.error,scenario.match);
+ assert.equal(failed.error,reply.error);assert.equal(failed.status,scenario.status);assert.equal(failed.retryAfter,scenario.retryAfter);
+ assert.equal(sent.options.headers['X-FormRelay-Key'],key);assert.deepEqual(JSON.parse(sent.options.body),{fields:definitions});
+ assert.equal(reply.error.includes(key),false);assert.equal(session['formrelay.tab.1'],undefined);
+});
+
 
 test('localhost development works without deployment settings and protects response ownership',async()=>{
  const s=await launch({NODE_ENV:'development'});try{
@@ -139,11 +160,55 @@ test('worker session survives restart, isolates tabs/documents, rejects stale up
  let worker=load();const sender={id:'trusted',tab:tabs[1],url:tabs[1].url,documentId:'doc-a'};
  assert.equal((await worker.call({action:'INIT',documentToken:'a'},sender)).ok,true);
  await worker.call({action:'STATE_UPDATE',documentToken:'a',state:{origin:'https://one.example',selection:fields,status:'selected'}},sender);
- session['formrelay.tab.1'].request={id:'a'.repeat(32),token:'private-owner',base:'http://localhost:3000',url:'http://localhost:3000/r/'+'a'.repeat(32),sourceOrigin:'https://one.example',expiresAt:Date.now()+60000,fields};
+ session['formrelay.tab.1'].request={id:'a'.repeat(32),token:'private-owner',base:'http://localhost:3000',url:'http://localhost:3000/r/'+'a'.repeat(32),sourceOrigin:'https://one.example',sourcePath:'/form',expiresAt:Date.now()+60000,fields};
+ delete session['formrelay.tab.1'].requests; // Simulate a session written by the previous single-request release.
  worker=load();const restored=await worker.call({action:'INIT',documentToken:'b'},{...sender,documentId:'doc-b'});assert.equal(restored.request.token,'private-owner');assert.equal(session['formrelay.tab.1'].view,null);
  assert.equal((await worker.call({action:'STATE_UPDATE',documentToken:'a',state:{status:'stale'}},sender)).ok,false);
  assert.equal((await worker.call({action:'INIT',documentToken:'two'},{id:'trusted',tab:tabs[2],url:tabs[2].url,documentId:'two'})).request,null);
  const publicState=await worker.call({action:'GET_TAB_STATE',tabId:1});assert.equal(publicState.request.token,undefined);
  tabs[1].url='https://another.example/form';assert.equal((await worker.call({action:'GET_TAB_STATE',tabId:1})).request,null);
- worker.removed(1);await new Promise(resolve=>setTimeout(resolve,0));assert.equal(session['formrelay.tab.1'],undefined);
+ worker.removed(1);await new Promise(resolve=>setTimeout(resolve,0));assert.equal(session['formrelay.tab.1'].requests['a'.repeat(32)].view.phase,'unavailable');
+});
+
+test('worker retains multiple request IDs, credentials and history across drafts, restart, navigation and tab closure',async()=>{
+ const session={};let count=0,prepared=fields;const tabs={1:{id:1,url:'http://localhost:3108/demo'}};
+ function load(){let listener,removed,updated;const chrome={runtime:{id:'trusted',onMessage:{addListener:fn=>listener=fn}},storage:{session:{get:async name=>name===null?session:{[name]:session[name]},set:async data=>Object.assign(session,data),remove:async name=>{delete session[name]}}},tabs:{get:async id=>tabs[id],sendMessage:async(id,msg)=>msg.action==='PREPARE_REQUEST'?{ok:true,documentToken:'doc',fields:prepared}:{ok:true},onRemoved:{addListener:fn=>removed=fn},onUpdated:{addListener:fn=>updated=fn}}};
+ vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../../extension/background.js'),'utf8'),{URL,Error,Date,chrome,fetch:async()=>({ok:true,status:201,json:async()=>({id:String(++count).repeat(32),ownerToken:'owner-'+count,url:'http://localhost:3108/r/'+String(count).repeat(32),expiresAt:Date.now()+60000})})});
+ return {call:(msg,sender={id:'trusted'})=>new Promise(resolve=>listener(msg,sender,resolve)),removed,updated};}
+ let worker=load();const create=()=>worker.call({action:'CREATE_REQUEST',tabId:1,base:'http://localhost:3108'});
+ const a=await create();assert.equal(a.ok,true);assert.equal((await worker.call({action:'CLEAR_REQUEST',tabId:1})).ok,true);
+ prepared=[{key:'occupation',label:'Occupation',type:'text'}];const b=await create();assert.equal(b.ok,true);assert.notEqual(a.request.id,b.request.id);
+ worker=load();const restored=await worker.call({action:'INIT',documentToken:'next'},{id:'trusted',tab:tabs[1],url:tabs[1].url,documentId:'next'});
+ assert.equal(restored.requests.length,2);assert.deepEqual(Array.from(restored.requests,r=>r.token),['owner-1','owner-2']);
+ const history=await worker.call({action:'GET_REQUESTS'});assert.equal(history.requests.length,2);assert.equal(JSON.stringify(history).includes('owner-'),false);
+ tabs[1].url+='?different-step=1';worker.updated(1,{status:'loading'});await new Promise(resolve=>setTimeout(resolve,0));
+ const foreign=await worker.call({action:'INIT',documentToken:'other'},{id:'trusted',tab:tabs[1],url:tabs[1].url,documentId:'other'});assert.equal(foreign.requests.length,0);
+ assert.equal((await worker.call({action:'GET_REQUESTS'})).requests.every(r=>r.phase==='unavailable'),true);
+ worker.removed(1);await new Promise(resolve=>setTimeout(resolve,0));assert.equal(Object.keys(session['formrelay.tab.1'].requests).length,2);
+ assert.equal((await worker.call({action:'STATE_UPDATE',documentToken:'next',state:{requests:[]}}, {id:'trusted',tab:tabs[1],url:tabs[1].url})).ok,false);
+ session['formrelay.tab.1'].requests[a.request.id].expiresAt=Date.now()-1;assert.equal((await worker.call({action:'GET_REQUESTS'})).requests.find(r=>r.id===a.request.id).phase,'expired');
+});
+
+test('backend independently accepts B before A while enforcing each owner token and field schema',async()=>{
+ const s=await launch();try{
+ const a=await (await s.create()).json();
+ const b=await (await s.request('/api/requests',{method:'POST',headers:{'X-FormRelay-Key':key},body:JSON.stringify({fields:[{key:'occupation',label:'Occupation',type:'text'}]})})).json();
+ const submit=(r,answers)=>s.request('/api/requests/'+r.id+'/answer',{method:'POST',body:JSON.stringify({answers})});
+ assert.equal((await submit(b,{guardian:'Wrong schema'})).status,400);
+ assert.equal((await submit(b,{occupation:'Fictional Teacher'})).status,200);
+ assert.equal((await s.request('/api/requests/'+b.id+'/status',{headers:{Authorization:'Bearer '+a.ownerToken}})).status,403);
+ assert.equal((await (await s.request('/api/requests/'+a.id+'/status',{headers:{Authorization:'Bearer '+a.ownerToken}})).json()).submitted,false);
+ assert.equal((await submit(a,{guardian:'Morgan Example'})).status,200);
+ for(const [r,expected] of [[a,{guardian:'Morgan Example'}],[b,{occupation:'Fictional Teacher'}]])assert.deepEqual((await (await s.request('/api/requests/'+r.id+'/status',{headers:{Authorization:'Bearer '+r.ownerToken}})).json()).answers,expected);
+ }finally{await s.stop()}
+});
+
+test('Other answers require exactly the selected custom texts, preserve checkbox choices, and accept full questions',()=>{
+ const {definitions,validateAnswers}=require('../fields');
+ const fields=definitions([{key:'question',label:'Which fictional subject interests you? '+ 'Please explain the additional subject in your own words. '.repeat(3),type:'checkbox-group',options:[{value:'math',label:'Mathematics'},{value:'plain',label:'Other'},{value:'custom',label:'Other (specify)',other:true,existingAnswer:'Never expose'}]}]);
+ assert.equal(fields[0].label.length>100,true);assert.equal(JSON.stringify(fields).includes('Never expose'),false);
+ const valid={question:{value:['math','custom'],other:{custom:'Fictional Robotics'}}};assert.deepEqual(JSON.parse(JSON.stringify(validateAnswers(fields,valid))),valid);
+ for(const question of [['custom'],{value:['custom'],other:{}},{value:['math'],other:{custom:'Not selected'}},{value:['custom'],other:{custom:''}},{value:['custom'],other:{custom:'x'.repeat(501)}},{value:['custom'],other:{unknown:'Wrong identity'}},{value:['custom'],other:{custom:'Text'},extra:'Unexpected'}])assert.throws(()=>validateAnswers(fields,{question}));
+ assert.deepEqual(validateAnswers(fields,{question:['plain']}).question,['plain']);
+ const radio=definitions([{key:'radio',label:'Which destination?',type:'radio',options:[{value:'custom',label:'Other',other:true}]}]);assert.throws(()=>validateAnswers(radio,{radio:'custom'}));assert.equal(validateAnswers(radio,{radio:{value:'custom',other:{custom:'Fictional City'}}}).radio.other.custom,'Fictional City');
 });

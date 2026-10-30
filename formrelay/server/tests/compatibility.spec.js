@@ -81,12 +81,12 @@ test('dynamic fields and duplicate labels/names keep exact mappings; replacement
   await expect(page.locator('#second input')).toHaveValue('Fictional second address'); await expect(page.locator('#first input')).toHaveValue('');
 });
 
-test('compatibility rejects credential, hidden, non-native and populated fields; changed choices are never guessed', async ({page, request}) => {
+test('compatibility rejects credential, hidden and unsupported controls, allows filled fields; changed choices are never guessed', async ({page, request}) => {
   await setup(page, `<form id="login"><label>Password<input type="password"></label><label>Account email<input type="email"></label></form><form id="safe"><label>Login token<input name="access_token"></label><label>One time code<input autocomplete="one-time-code"></label><label>Payment<input autocomplete="cc-number"></label><input type="hidden" name="hidden">
     <label>Already filled<input value="Do not upload"></label><label>Multiple<select multiple><option>A</option></select></label><label>Shipping address<textarea></textarea></label>
     <label>Country<select id="country"><option value="">Choose</option><option value="CA">Canada</option></select></label></form><div role="combobox">Custom widget<input aria-label="Custom dropdown"></div><iframe title="Unsupported frame"></iframe>`);
   await command(page, 'START'); const report = await command(page, 'CHECK'); expect(report.custom).toBe(1); expect(report.frames).toBe(1);
-  expect(report.fields.filter(f => f.supported).map(f => f.label)).toEqual(['Shipping address','Country']);
+  expect(report.fields.filter(f => f.supported).map(f => f.label)).toEqual(['Already filled','Shipping address','Country']);
   for (const field of report.fields.filter(f => !f.supported)) expect(field.reason.length).toBeGreaterThan(0);
   await page.locator('#country').click(); const created = await requestFor(page, request);
   await page.locator('#country option[value=CA]').evaluate(option => {option.value = 'OTHER'; option.textContent = 'Another choice';});
@@ -132,7 +132,7 @@ test('page-rejected values are reported as failed; user edits made while waiting
   await page.locator('#revert').evaluate(el => el.addEventListener('input', () => setTimeout(() => {el.value = '';}, 220)));
   await command(page, 'START'); await page.locator('#revert').click(); await page.locator('#edited').click();
   const created = await requestFor(page, request); await page.locator('#edited').fill('Keep my manual answer'); await answer(request, created, {'Reverting field':'Remote answer','Edited field':'Must not overwrite'});
-  await expect.poll(async () => (await command(page, 'CHECK')).selected.map(f => f.state)).toEqual(['failed','skipped']);
+  await expect.poll(async () => (await command(page, 'CHECK')).selected.map(f => f.state)).toEqual(['failed','overwrite']);
   await expect(page.locator('#revert')).toHaveValue(''); await expect(page.locator('#edited')).toHaveValue('Keep my manual answer'); await expect(page.locator('#revert')).toHaveCSS('outline-color','rgb(188, 36, 60)');
 });
 

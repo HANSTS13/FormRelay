@@ -14,6 +14,7 @@ async function popup(context,store){
    if(msg.action==='CLEAR'||msg.action==='NEW_REQUEST'){state.selection=[];state.request=null;return {ok:true}}
    if(msg.action==='STOP'){state.selecting=false;return {ok:true}}
    if(msg.action==='CHECK')return {fields:[],selected:[],limitations:'Native controls only.'};
+   if(msg.action==='CONFIRM_OVERWRITE'){store.overwrites=(store.overwrites||0)+1;state.request.phase='completed';state.request.results[0]={...state.request.results[0],state:'verified',needsOverwrite:false};return {ok:true}}
    return {ok:true};
   }
   if(kind==='worker'){
@@ -32,7 +33,7 @@ test('popup reopen, tab isolation, removal, clear and persistent request present
  const store={active:1,tabs:{1:state(),2:{...state(),selection:[]}}};const open=await popup(context,store);let page=await open();await expect(page.locator('#selection-count')).toHaveText('1 selected');await page.setViewportSize({width:392,height:600});await page.screenshot({path:testInfo.outputPath('popup-fields.png')});await page.close();
  page=await open();await expect(page.locator('#selection-count')).toHaveText('1 selected');await page.close();store.active=2;
  page=await open();await expect(page.locator('#selection-count')).toHaveText('0 selected');await expect(page.locator('#empty-fields')).toBeVisible();await page.close();store.active=1;
- page=await open();await page.getByRole('button',{name:'Create request',exact:true}).click();await expect(page.locator('#request-status')).toHaveText('Waiting for response');await expect(page.locator('#link')).toHaveValue(/\/r\/[a-f0-9]{32}$/);await page.close();
+ page=await open();await page.getByRole('button',{name:'Create request',exact:true}).click();await expect(page.locator('#request-status')).toHaveText('Pending');await expect(page.locator('#link')).toHaveValue(/\/r\/[a-f0-9]{32}$/);await page.close();
  page=await open();await page.getByRole('tab',{name:/Requests/}).click();await expect(page.locator('#link')).toHaveValue(/\/r\/[a-f0-9]{32}$/);expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 test('popup keyboard tabs, settings privacy, backend errors and clear selection',async({context})=>{
@@ -40,4 +41,11 @@ test('popup keyboard tabs, settings privacy, backend errors and clear selection'
  await page.getByRole('button',{name:'Clear selection',exact:true}).click();await expect(page.locator('#selection-count')).toHaveText('0 selected');
  await page.getByRole('tab',{name:/Fields/}).focus();await page.keyboard.press('End');await expect(page.getByRole('tab',{name:'Settings'})).toHaveAttribute('aria-selected','true');
  await expect(page.locator('#accessKey')).toHaveAttribute('type','password');await page.getByRole('button',{name:'Save & test connection'}).click();await expect(page.locator('#message')).toContainText('Backend unavailable');
+});
+
+test('overwrite UI requires an explicit confirmation and supports cancelling the replacement',async({context})=>{
+ const field={key:'name',label:'Guardian name',type:'text'};const request={id:'a'.repeat(32),base:'http://localhost:3000',url:'http://localhost:3000/r/'+'a'.repeat(32),phase:'partial',fields:[field],results:[{...field,state:'overwrite',needsOverwrite:true}]};
+ const store={active:1,tabs:{1:{...state(),selection:[],request,requests:[request]}}};const open=await popup(context,store),page=await open();await page.getByRole('tab',{name:/Requests/}).click();
+ page.once('dialog',dialog=>dialog.dismiss());await page.getByRole('button',{name:'Replace existing answer for Guardian name'}).click();expect(store.overwrites||0).toBe(0);
+ page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'Replace existing answer for Guardian name'}).click();await expect(page.locator('#request-status')).toHaveText('Autofilled');expect(store.overwrites).toBe(1);
 });
