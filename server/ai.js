@@ -65,7 +65,7 @@ ${JSON.stringify(sanitized, null, 2)}`;
     generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
   };
 
-  const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+  const models = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
   let lastError = null;
 
   for (const modelName of models) {
