@@ -1,1 +1,215 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Demo Scholarship Form</title><style>body{font-family:system-ui;max-width:570px;margin:30px auto;padding:20px}label{display:block;margin-top:18px}input{box-sizing:border-box;display:block;width:100%;padding:12px;margin-top:6px}button{padding:12px;margin-top:24px}</style></head><body><h1>Scholarship Application (Demo)</h1><p>Use test data only. Activate FormRelay in Chrome to select guardian fields.</p><form id="scholarship"><label>Student Name<input id="student_name" type="text" value="Demo Student"></label><label>Guardian Full Name<input id="guardian_name" type="text"></label><label>Guardian Occupation<input id="guardian_job" type="text"></label><label>Guardian Phone<input id="guardian_phone" type="tel"></label><label>Annual Family Income<input id="family_income" type="number"></label><button type="submit">Submit demo</button></form><script src="/demo.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Scholarship Application (Demo) — FormRelay</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #0d1216;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(13, 148, 136, 0.22) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(212, 185, 150, 0.15) 0px, transparent 50%),
+        radial-gradient(at 80% 15%, rgba(30, 41, 59, 0.55) 0px, transparent 55%),
+        linear-gradient(180deg, #0d1216 0%, #131a20 50%, #0b0f12 100%);
+      background-attachment: fixed;
+      color: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 16px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 540px;
+    }
+
+    .header-tag {
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #d4b996;
+      margin-bottom: 14px;
+    }
+
+    main {
+      background: rgba(18, 24, 30, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(212, 185, 150, 0.08);
+      border-radius: 12px;
+      padding: 38px 34px;
+      position: relative;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #ffffff;
+      text-align: center;
+      margin-bottom: 22px;
+      position: relative;
+      padding-bottom: 14px;
+    }
+
+    h1::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 44px;
+      height: 2px;
+      background: linear-gradient(90deg, #14b8a6, #d4b996);
+    }
+
+    .notice {
+      background: rgba(15, 23, 42, 0.65);
+      border-left: 3px solid #14b8a6;
+      border-radius: 4px;
+      padding: 13px 16px;
+      margin-bottom: 26px;
+      font-size: 13.5px;
+      line-height: 1.5;
+      color: #cbd5e1;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .notice strong {
+      display: block;
+      color: #d4b996;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    #scholarship {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    label {
+      display: block;
+      font-size: 13.5px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      color: #f1f5f9;
+    }
+
+    input {
+      display: block;
+      width: 100%;
+      padding: 12px 14px;
+      margin-top: 7px;
+      font-family: inherit;
+      font-size: 14.5px;
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 6px;
+      outline: none;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+    }
+
+    input:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(212, 185, 150, 0.4);
+    }
+
+    input:focus {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: #14b8a6;
+      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.25);
+    }
+
+    button[type="submit"] {
+      background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 13.5px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+      width: 100%;
+      box-shadow: 0 4px 16px rgba(13, 148, 136, 0.35);
+      transition: all 0.2s ease;
+    }
+
+    button[type="submit"]:hover {
+      background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+      box-shadow: 0 6px 22px rgba(20, 184, 166, 0.45);
+      transform: translateY(-1px);
+    }
+
+    button[type="submit"]:active {
+      transform: translateY(0);
+      box-shadow: 0 2px 8px rgba(13, 148, 136, 0.35);
+    }
+
+    .footer-meta {
+      margin-top: 22px;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+      letter-spacing: 0.05em;
+      line-height: 1.6;
+    }
+
+    .footer-meta strong {
+      color: #d4b996;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-tag">FormRelay Verification Portal</div>
+    <main>
+      <h1>Scholarship Application (Demo)</h1>
+      <div class="notice">
+        <strong>Demo Instructions</strong>
+        <p>Use test data only. Activate FormRelay in Chrome to select guardian fields.</p>
+      </div>
+      <form id="scholarship">
+        <label>Student Name<input id="student_name" type="text" value="Demo Student"></label>
+        <label>Guardian Full Name<input id="guardian_name" type="text"></label>
+        <label>Guardian Occupation<input id="guardian_job" type="text"></label>
+        <label>Guardian Phone<input id="guardian_phone" type="tel"></label>
+        <label>Annual Family Income<input id="family_income" type="number"></label>
+        <button type="submit">Submit demo</button>
+      </form>
+    </main>
+    <div class="footer-meta">
+      <p>Single-Origin Demo Sandbox • <strong>Activate Chrome Extension to Test</strong></p>
+    </div>
+  </div>
+  <script src="/demo.js"></script>
+</body>
+</html>
