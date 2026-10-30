@@ -1,13 +1,13 @@
 # Native and accessible form compatibility
 
-FormRelay supports common native controls and narrowly defined accessible checkbox/radio adapters in the main document. See [UPGRADE_REPORT.md](UPGRADE_REPORT.md) for the current UI, lifecycle, navigation, security and test report. This is not universal website compatibility. The scholarship demo, localhost/LAN configuration, owner-token access checks, request expiry, rate limits, and production HTTPS settings are preserved.
+FormRelay supports common native controls and narrowly defined accessible checkbox/radio and single-choice dropdown adapters in the main document. See [UPGRADE_REPORT.md](UPGRADE_REPORT.md) for the earlier UI/lifecycle report and [LOCAL_DEMO.md](LOCAL_DEMO.md) for the current multiple-request workflow. This is not universal website compatibility. The scholarship demo, localhost/LAN configuration, owner-token access checks, request expiry, rate limits, and production HTTPS settings are preserved.
 
 ## Try the updated extension
 
 1. Restart the backend from `formrelay/server` with `npm.cmd start` in development mode, following [LOCAL_DEMO.md](LOCAL_DEMO.md). Existing in-memory requests disappear on restart, so create a fresh request.
 2. Open `chrome://extensions` and reload the existing FormRelay extension. Refresh the original form tab before selecting fields so that the updated content script is injected.
 3. Open FormRelay and choose **Check compatibility / results**. Expand **Show field compatibility** to see available native fields and the reason each unavailable field is excluded. The report includes local form/structural hints, duplicate-label warnings, iframe/custom-widget counts, and selected-field results.
-4. Choose **Select fields**. Blue dashed outlines identify supported unanswered controls; clicking a control or its native label selects it with a solid green outline. Click again to deselect. Clicking any member of a radio group selects/deselects the whole group. Non-submit `type="button"` controls, such as Add address, can still reveal dynamic fields. Normal submit/reset buttons and Enter submission are blocked during selection.
+4. Choose **Start selection**. Blue dashed outlines identify supported controls; clicking a control or its native label selects it with a solid green outline. Click again to deselect. Clicking a radio/checkbox group selects the logical question. Filled fields are selectable, but a different incoming answer requires explicit overwrite approval. Non-submit `type="button"` controls can still reveal dynamic fields. Normal submit/reset buttons and Enter submission are blocked during selection.
 5. Finish selection and create a request as before. The recipient sees matching text areas, dropdowns, radio choices, and checkboxes. An unchecked optional recipient checkbox sends an explicit `false`; a required checkbox must be checked.
 6. After submission, open **Check compatibility / results** again. Green backgrounds mean the DOM values survived two delayed checks. Skipped/rejected values and controls that need confirmation are explained. Review the actual original page before manually submitting.
 
@@ -15,15 +15,26 @@ FormRelay supports common native controls and narrowly defined accessible checkb
 
 | Control | Behavior and limits |
 | --- | --- |
-| Text, email, telephone, number, date | Native inputs; existing nonempty answers are preserved. Browser constraints are checked before dispatching events. |
+| Text, email, telephone, number, date | Native inputs; existing answers remain local and a different returned answer requires overwrite confirmation. Original constraints and retained values are checked. |
 | Textarea | Native multiline text, up to 500 characters, subject to original constraints. |
-| Single select | Starts unanswered (`value=""` or no selection). Uses nonempty, enabled choices; no multi-select. |
-| Radio | One logical field per native form owner and name; each unnamed radio is separate. Already answered groups are excluded. Groups containing hidden/disabled members are conservatively unavailable. |
-| Checkbox | Single checkboxes are booleans. Explicit labelled fieldsets/groups with related checkboxes are logical multi-choice questions. Already answered controls/groups are excluded. |
+| Single select | Native nonempty enabled choices, including an existing selection with overwrite approval; no multi-select. Dynamic options must be loaded before selecting the question. Changed choices pause for mapping confirmation. |
+| Radio | One logical field per native form owner and name; each unnamed radio is separate. Answered groups are selectable with overwrite approval. Groups containing hidden/disabled members remain conservatively unavailable. |
+| Checkbox | Single checkboxes are booleans. Labelled fieldsets, ARIA groups and question containers with related checkboxes form logical multi-choice questions, including supported Other text choices. |
+| Accessible dropdown | Noneditable div/span/button controls with a single linked ARIA listbox (or a listbox itself), loaded unique options and observable aria-selected state. Opens the widget and activates the exact option, then verifies retention. Editable search/combobox widgets and unknown contracts are unsupported. |
 | Dynamic controls | Event delegation and a MutationObserver detect new native controls without refreshing. Reordered connected controls retain their exact references. |
 | Framework controls | Native prototype setters and bubbling events; real React 18 controlled text/textarea/select/radio/checkbox fixtures are covered by tests. Other frameworks are not individually certified. |
 
-Limits: 20 selected logical fields, 50 choices per select/radio field, the existing 32 KB request body limit, and a compatibility scan of the first 1,000 controls. Duplicate option labels/values are unavailable rather than guessed. A dropdown with a meaningful default answer is treated as already filled; intentionally clear it on the original page first if delegation is appropriate.
+Limits: 20 selected logical fields, 50 choices per question, 1,000 characters per question label, 500 per choice label/answer, the existing 32 KB request body limit, and a scan of the first 1,000 controls. Oversized questions/choices and duplicate option identities are reported as unsupported rather than truncated or guessed.
+
+## Question text, Other choices and reuse
+
+Questions use associated labels, fieldset legends, ARIA labels/references and headings in explicit question containers. Option labels remain separate from question text. Checkbox/radio questions are represented once, with their permitted choices in the recipient form.
+
+A plain Other option stays a normal choice. A custom-text choice requires an explicit data-other-input/aria-controls reference to a text input or textarea in the same question, or exactly one text input nested in that option's label. Sensitive/hidden-type inputs, missing explicit targets and ambiguous nested inputs are unsupported. Conditional Other inputs must already exist in the DOM and become editable after choosing Other. Dynamically created, unlinked Other controls require a verified adapter; they are not inferred from a nearby arbitrary textbox. Checkbox responses can combine ordinary choices and supported Other text. The backend validates the selected choice IDs and requires exactly the associated nonempty custom texts. Existing answers and DOM references are never included in creation payloads.
+
+New request and Clear selection restore temporary styling while preserving saved requests. Any field may be selected again, including one held by another pending request. If a returned answer differs from a current nonempty value, that request pauses with an overwrite result. In Requests choose Replace existing answer and explicitly confirm. Approval applies to that request/field and the current local value; subsequent edits require fresh approval. Undo for an older request cannot modify a field owned by a newer request. Compound Other controls and custom dropdowns currently require manual undo.
+
+These adapters were tested on local HTML/ARIA fixtures, including actual React/Vue fixtures elsewhere in the suite. This work did not submit or certify Google Forms, Microsoft Forms, or other third-party websites. Unsupported, dynamically virtualized, or trusted-event-only controls remain unavailable.
 
 ## Mapping confirmation
 

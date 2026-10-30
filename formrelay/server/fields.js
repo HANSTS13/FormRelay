@@ -9,7 +9,7 @@ function definitions(fields) {
   if (!Array.isArray(fields) || fields.length < 1 || fields.length > 20) throw Error('Select 1-20 fields');
   const keys = new Set();
   return fields.map(f => {
-    if (!f || !keyPattern.test(f.key) || typeof f.key !== 'string' || forbidden.has(f.key) || keys.has(f.key) || !text(f.label, 100) || !types.has(f.type) || sensitive.test(f.label.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' '))) throw Error('Unsupported, duplicate, or sensitive fields');
+    if (!f || !keyPattern.test(f.key) || typeof f.key !== 'string' || forbidden.has(f.key) || keys.has(f.key) || !text(f.label, 1000) || !types.has(f.type) || sensitive.test(f.label.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' '))) throw Error('Unsupported, duplicate, or sensitive fields');
     keys.add(f.key);
     const result = {key: f.key, label: f.label, type: f.type};
     if ((f.type === 'checkbox'||f.type==='checkbox-group')) result.required = f.required === true;
@@ -17,9 +17,9 @@ function definitions(fields) {
       if (!Array.isArray(f.options) || !f.options.length || f.options.length > 50) throw Error('Select or radio fields need 1-50 choices');
       const values = new Set();
       result.options = f.options.map(option => {
-        if (!option || typeof option.value !== 'string' || !keyPattern.test(option.value) || forbidden.has(option.value) || values.has(option.value) || !text(option.label, 100)) throw Error('Invalid choice definitions');
+        if (!option || typeof option.value !== 'string' || !keyPattern.test(option.value) || forbidden.has(option.value) || values.has(option.value) || !text(option.label, 500)) throw Error('Invalid choice definitions');
         values.add(option.value);
-        return {value: option.value, label: option.label};
+        return {value: option.value, label: option.label,...(option.other===true?{other:true}:{})};
       });
     }
     return result;
@@ -30,7 +30,17 @@ function validateAnswers(fields, incoming) {
   if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming) || Object.keys(incoming).length !== fields.length || Object.keys(incoming).some(key => !fields.some(f => f.key === key))) throw Error('Unexpected or missing answer fields');
   const answers = Object.create(null);
   for (const f of fields) {
-    const v = incoming[f.key];
+    const raw = incoming[f.key];
+    const structured=raw&&typeof raw==='object'&&!Array.isArray(raw);
+    const v=structured?raw.value:raw;
+    if(structured){
+      if(!f.options?.some(o=>o.other)||Object.keys(raw).some(k=>!['value','other'].includes(k))||!raw.other||typeof raw.other!=='object'||Array.isArray(raw.other))throw Error('Invalid Other answer');
+    }
+    const selected=f.type==='checkbox-group'?v:[v];
+    const custom=f.options?.filter(o=>o.other&&Array.isArray(selected)&&selected.includes(o.value))||[];
+    if(custom.length||structured){
+      if(!structured||Object.keys(raw.other).length!==custom.length||Object.keys(raw.other).some(k=>!custom.some(o=>o.value===k))||custom.some(o=>!text(raw.other[o.value],500)))throw Error('Specify text for each selected Other option');
+    }
     if(f.type==='checkbox-group'){
       if(!Array.isArray(v)||new Set(v).size!==v.length||v.length>50||v.some(value=>typeof value!=='string'||!f.options?.some(o=>o.value===value))||(f.required&&!v.length))throw Error('Invalid checkbox choices');
     } else if (f.type === 'checkbox') {
@@ -43,7 +53,7 @@ function validateAnswers(fields, incoming) {
       if (f.type === 'date' && (!/^\d{4}-\d{2}-\d{2}$/.test(v) || !Number.isFinite(Date.parse(v)) || new Date(v).toISOString().slice(0, 10) !== v)) throw Error('Invalid date');
       if ((f.type === 'select' || f.type === 'radio') && !f.options?.some(option => option.value === v)) throw Error('Answer is not an offered choice');
     }
-    answers[f.key] = v;
+    answers[f.key] = structured ? {value:v,other:Object.fromEntries(custom.map(o=>[o.value,raw.other[o.value]]))} : v;
   }
   return answers;
 }

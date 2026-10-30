@@ -17,6 +17,7 @@
   <button id="new-fields" class="text-button new-request" hidden>Start a new request</button>
 </section>
 <section id="panel-requests" role="tabpanel" aria-labelledby="tab-requests" hidden>
+  <label class="label" for="request-picker">Saved requests (this browser session)</label><select id="request-picker" aria-label="Saved requests"></select>
   <div class="section-heading"><div><h1>Collaborate from any tab</h1><p>Keep the original page open.</p></div></div>
   <div id="empty-request" class="empty-state"><div class="empty-icon" aria-hidden="true">&#8599;</div><h2>No request yet</h2><p>Select a few questions in Fields, then create a link for your collaborator.</p><button id="go-fields" class="button secondary">Choose fields</button></div>
   <article id="request-card" class="request-card" hidden>
@@ -27,7 +28,7 @@
     <p id="expiry" class="hint"></p><p id="request-origin" class="hint"></p><ul id="requested-fields" class="compact-list" aria-label="Requested questions"></ul>
     <div id="results" class="results"></div>
     <button id="undo" class="button quiet wide" disabled>Undo inserted values</button><button id="new-request" class="button primary wide">New request</button>
-    <p class="hint">Links expire automatically. Cancellation and revocation are not available.</p>
+    <p class="hint">New request clears only your draft. Earlier links and mappings remain active until expiry. Requests are kept for this browser session.</p>
   </article>
 </section>
 <section id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
