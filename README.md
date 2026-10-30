@@ -2,7 +2,13 @@
 
 Controlled demo, **not** production software. Use fictional data only. It has no recipient authentication, persistent storage, production-grade encryption, or comprehensive field classification.
 
-## Run locally
+## Maintained application
+
+The current FormRelay application is in **`formrelay/`**. Run `npm.cmd start` from `formrelay/server/` using Node.js 24 and load **`formrelay/extension/`** in Chrome. Follow [LOCAL_DEMO.md](formrelay/LOCAL_DEMO.md) for the current localhost workflow and [COMPATIBILITY.md](formrelay/COMPATIBILITY.md) for supported controls.
+
+The root-level `server/` and `extension/` directories below are preserved legacy starter copies, including aibin's dropdown contribution. They do not contain the maintained application's full security, multiple-request, or compatibility protections. The older setup and deployment instructions below describe those legacy copies; use the linked maintained documentation for current work.
+
+## Run locally (legacy starter)
 
 1. Install Node.js 20+ and Google Chrome.
 2. Open terminal in `server/` and run `npm install` then `npm start`.
