@@ -120,3 +120,134 @@ chrome.tabs.onActivated?.addListener(()=>refresh());
 chrome.tabs.onUpdated?.addListener((id,change)=>{if(id===tabId&&change.status==='complete')refresh()});
 (async()=>{const saved=await chrome.storage.local.get('formrelayBase');$('base').value=saved.formrelayBase||'http://localhost:3000';const access=(await chrome.storage.session.get('formrelayAccess')).formrelayAccess;if(access?.origin===$('base').value)$('accessKey').value=access.key;await refresh()})().catch(error=>notify(error.message,'error'));
 setInterval(expiry,1000);
+
+
+// =============================================================
+// AI Smart Field Grouping Feature
+// =============================================================
+let scannedFields = [];
+let aiGroups = [];
+
+const aiBtn = $('btn-ai-group');
+if (aiBtn) {
+  aiBtn.onclick = async () => {
+    try {
+      notify('Scanning webpage fields for AI analysis...', 'loading');
+      await ensure();
+      const res = await content('SCAN_FIELDS');
+      if (!res?.ok || !res.fields?.length) {
+        throw new Error('No supported form questions found on this page. Navigate to http://localhost:3000/demo first.');
+      }
+      scannedFields = res.fields;
+      $('ai-scan-summary').textContent = 'Found ' + scannedFields.length + ' supported questions on this form.';
+      $('ai-panel').style.display = 'block';
+      $('ai-approval').style.display = 'block';
+      $('ai-loading').style.display = 'none';
+      $('ai-results').style.display = 'none';
+      notify('');
+    } catch (err) {
+      notify(err.message, 'error');
+    }
+  };
+}
+
+if ($('ai-close')) $('ai-close').onclick = () => { $('ai-panel').style.display = 'none'; };
+if ($('ai-cancel')) $('ai-cancel').onclick = () => { $('ai-panel').style.display = 'none'; };
+if ($('btn-skip-ai')) $('btn-skip-ai').onclick = () => {
+  $('ai-panel').style.display = 'none';
+  notify('Manual selection enabled. Click "+ Start selection".');
+};
+
+if ($('ai-confirm')) {
+  $('ai-confirm').onclick = async () => {
+    $('ai-approval').style.display = 'none';
+    $('ai-loading').style.display = 'block';
+    $('ai-results').style.display = 'none';
+
+    try {
+      const origin = backendOrigin($('base').value);
+      const resp = await fetch(origin + '/api/ai/group-fields', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: scannedFields })
+      });
+      const data = await resp.json().catch(() => ({ ok: false, error: 'Invalid response from server' }));
+      $('ai-loading').style.display = 'none';
+
+      if (!data.ok) {
+        $('ai-approval').style.display = 'block';
+        notify('AI Error: ' + data.error, 'error');
+        return;
+      }
+
+      aiGroups = data.groups || [];
+      if (!aiGroups.length) {
+        $('ai-approval').style.display = 'block';
+        notify('AI found no separable groups.', 'error');
+        return;
+      }
+
+      renderAiGroupCards(aiGroups, origin);
+      $('ai-results').style.display = 'block';
+      notify('AI identified ' + aiGroups.length + ' group(s). Click below to create QR.');
+    } catch (err) {
+      $('ai-loading').style.display = 'none';
+      $('ai-approval').style.display = 'block';
+      notify('Network error: ' + err.message, 'error');
+    }
+  };
+}
+
+function renderAiGroupCards(groups, origin) {
+  const container = $('group-cards-container');
+  container.replaceChildren();
+
+  groups.forEach((g, idx) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 8px; font-size: 11px;';
+    
+    const title = document.createElement('div');
+    title.style.cssText = 'font-weight: 700; color: #1e1b4b; font-size: 12px; margin-bottom: 4px;';
+    title.textContent = '👥 ' + g.groupName;
+
+    const desc = document.createElement('div');
+    desc.style.cssText = 'color: #64748b; font-size: 10px; margin-bottom: 6px;';
+    desc.textContent = g.description || '';
+
+    const list = document.createElement('div');
+    list.style.cssText = 'padding-left: 6px; margin-bottom: 8px;';
+    (g.fields || []).forEach(f => {
+      const item = document.createElement('div');
+      item.style.cssText = 'padding: 2px 0; color: #334155;';
+      item.textContent = '• ' + f.label + ' (' + (f.type || 'text') + ')';
+      list.appendChild(item);
+    });
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'button primary wide';
+    btn.style.cssText = 'background: #4f46e5; font-size: 11px; min-height: 32px; margin-top: 4px;';
+    btn.textContent = 'Create QR for ' + g.groupName;
+    btn.onclick = async () => {
+      btn.disabled = true;
+      btn.textContent = 'Creating QR...';
+      try {
+        const keys = (g.fields || []).map(f => f.key);
+        await content('SET_SELECTION', { keys });
+        const base = await saveSettings();
+        const result = await worker('CREATE_REQUEST', { base });
+        viewRequestId = result.request.id;
+        $('ai-panel').style.display = 'none';
+        section('requests');
+        notify('QR and link created for ' + g.groupName + '!');
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Create QR for ' + g.groupName;
+        notify(e.message, 'error');
+      }
+    };
+
+    card.append(title, desc, list, btn);
+    container.appendChild(card);
+  });
+}

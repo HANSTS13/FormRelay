@@ -393,6 +393,54 @@
       if(msg.documentToken&&msg.documentToken!==documentToken)throw Error('The page changed during request creation. Reopen FormRelay to confirm mappings.');
       if(msg.action==='GET_STATE'){if(!creating)await recoverContext();reply({...publicState(),ok:true});return}
       if(msg.action==='GET_SELECTION'){reply({fields:chosen.map(definition),issues:chosen.filter(f=>f.state!=='verified'&&mapping(f)).map(f=>({key:f.key,label:f.label,detail:mapping(f)}))});return}
+      if(msg.action==='SCAN_FIELDS'){
+        const all = [], seen = new Set();
+        const candidates = [...document.querySelectorAll(controls)];
+        for (const el of candidates.slice(0, 100)) {
+          if (seen.has(canonical(el))) continue;
+          const f = describe(el);
+          f.refs.forEach(ref => seen.add(ref));
+          if (!reason(f)) {
+            const key = f.id || f.name || ('field_' + all.length);
+            all.push({
+              key,
+              label: f.label,
+              type: f.type,
+              options: f.options ? f.options.map(o => ({ value: o.value, label: o.label })) : []
+            });
+          }
+        }
+        reply({ ok: true, fields: all });
+        return;
+      }
+      if(msg.action==='SET_SELECTION'){
+        stop();
+        chosen.forEach(f => f.refs.forEach(restore));
+        chosen = [];
+        const targetKeys = new Set(msg.keys || []);
+        const candidates = [...document.querySelectorAll(controls)];
+        const seen = new Set();
+        for (const el of candidates) {
+          if (seen.has(canonical(el))) continue;
+          const f = describe(el);
+          f.refs.forEach(ref => seen.add(ref));
+          const key = f.id || f.name;
+          if (targetKeys.has(key) && !reason(f)) {
+            const chosenItem = {
+              ...f,
+              key: 'field_' + Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2,'0')).join(''),
+              state: 'selected',
+              detail: ''
+            };
+            chosen.push(chosenItem);
+            f.refs.forEach(ref => paint(ref, 'selected'));
+          }
+        }
+        update();
+        refresh();
+        reply({ ok: true, count: chosen.length });
+        return;
+      }
       if(msg.action==='CHECK'){reply(compatibility());return}
       if(msg.action==='PREPARE_REQUEST'){
         if(creating||filling)throw Error('Wait for the current operation to finish.');

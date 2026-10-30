@@ -8,6 +8,43 @@
 <main>
 <section id="panel-fields" role="tabpanel" aria-labelledby="tab-fields">
   <div class="section-heading"><div><h1>Your selected questions</h1><p>Share only what you need help with.</p></div><span id="selection-count" class="pill">0 selected</span></div>
+  <!-- ✨ AI Smart Group Fields Button -->
+  <button id="btn-ai-group" class="button wide" type="button" style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #ffffff; border: none; margin-bottom: 12px; font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);">
+    ✨ AI Smart Group Fields
+  </button>
+
+  <!-- AI Grouping Interactive Panel -->
+  <div id="ai-panel" style="display: none; background: #ffffff; border: 1.5px solid #c7d2fe; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <strong style="color: #3730a3; font-size: 12px;">🤖 AI Field Grouping</strong>
+      <button id="ai-close" type="button" style="background: #e2e8f0; border: none; padding: 2px 7px; border-radius: 4px; font-size: 11px; cursor: pointer;">✕</button>
+    </div>
+
+    <!-- Step 1: Confirmation / Approval -->
+    <div id="ai-approval" style="display: none;">
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; font-size: 11px; margin-bottom: 8px; color: #334155;">
+        <strong id="ai-scan-summary">Found form fields on this page.</strong>
+        <p style="margin: 4px 0 0; color: #64748b; font-size: 10px;">AI will group these questions by who needs to fill them (e.g. Student vs Parent/Guardian) and generate separate links. Only field labels are processed.</p>
+      </div>
+      <div style="display: flex; gap: 6px;">
+        <button id="ai-confirm" class="button primary" type="button" style="flex: 1; min-height: 32px; font-size: 11px; background: #4f46e5;">Group with AI</button>
+        <button id="ai-cancel" class="button secondary" type="button" style="flex: 1; min-height: 32px; font-size: 11px;">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Loading State -->
+    <div id="ai-loading" style="display: none; text-align: center; padding: 14px; font-size: 12px; font-weight: 600; color: #4f46e5;">
+      ✨ Analyzing form with Gemini 3.8 Flash...<br>
+      <small style="color: #6366f1; font-weight: normal; font-size: 10px;">Grouping questions by person</small>
+    </div>
+
+    <!-- Step 3: Group Results -->
+    <div id="ai-results" style="display: none;">
+      <div id="group-cards-container" style="max-height: 240px; overflow-y: auto;"></div>
+      <button id="btn-skip-ai" class="button quiet wide" type="button" style="font-size: 10px; margin-top: 6px;">Switch to manual selection</button>
+    </div>
+  </div>
+
   <div class="selection-actions"><button id="select" class="button primary">&#43; Start selection</button><button id="finish" class="button secondary" disabled>Finish selection</button></div>
   <div id="empty-fields" class="empty-state"><div class="empty-icon" aria-hidden="true">&#9633;</div><h2>A little help goes a long way.</h2><p>Start selection, close this popup, then click unanswered questions on the page.</p><span class="hint">Your selections stay when you close this popup.</span></div>
   <ul id="fields" class="field-list" aria-label="Selected questions"></ul>
