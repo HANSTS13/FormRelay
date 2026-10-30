@@ -212,3 +212,22 @@ test('Other answers require exactly the selected custom texts, preserve checkbox
  assert.deepEqual(validateAnswers(fields,{question:['plain']}).question,['plain']);
  const radio=definitions([{key:'radio',label:'Which destination?',type:'radio',options:[{value:'custom',label:'Other',other:true}]}]);assert.throws(()=>validateAnswers(radio,{radio:'custom'}));assert.equal(validateAnswers(radio,{radio:{value:'custom',other:{custom:'Fictional City'}}}).radio.other.custom,'Fictional City');
 });
+
+test('local assistance preserves meaning, identity, choices and authoritative original labels',()=>{
+ const {simplifyField}=require('../ai');assert.equal(require('../../../server/ai').simplifyField,simplifyField);
+ for(const field of [{key:'country',label:'Country of residence',type:'select',options:[{value:'choice_0',label:'Canada'}]},{key:'start',label:'Employment start date',type:'date'},{key:'members',label:'Number of household members',type:'number'},{key:'monthly',label:'Monthly income',type:'number'},{key:'choices',label:'Which interests?',type:'checkbox-group',options:[{value:'choice_0',label:'Other',other:true}]}]){
+  const result=simplifyField(field);assert.equal(result.simplifiedLabel,field.label);assert.equal(result.originalLabel,field.label);assert.equal(result.key,field.key);assert.deepEqual(result.options,field.options);assert.equal(result.aiConfidence,undefined);assert.equal(result.assistanceSource,'local-rules');
+ }
+ assert.equal(simplifyField({key:'income',label:'Gross annual household remuneration',type:'number'}).simplifiedLabel,'Yearly income');
+ assert.equal(simplifyField({key:'last',label:'Surname',type:'text'}).simplifiedLabel,'Surname');
+});
+
+test('secure backend generates assistance from sanitized definitions without changing answers or ownership',async()=>{
+ const s=await launch();try{
+ const response=await s.request('/api/requests',{method:'POST',headers:{'X-FormRelay-Key':key},body:JSON.stringify({fields:[{key:'income',label:'Gross annual household remuneration',type:'number',value:'private-existing-answer',aiConfidence:'100%',aiHint:'untrusted-client-guidance'}]})});assert.equal(response.status,201);const created=await response.json();
+ const metadata=await (await s.request('/api/requests/'+created.id+'/fields')).json();assert.equal(metadata.fields[0].simplifiedLabel,'Yearly income');assert.equal(JSON.stringify(metadata).includes('private-existing-answer'),false);assert.equal(JSON.stringify(metadata).includes('untrusted-client-guidance'),false);assert.equal(metadata.fields[0].aiConfidence,undefined);
+ assert.equal((await s.request('/api/requests/'+created.id+'/status')).status,403);
+ assert.equal((await s.request('/api/requests/'+created.id+'/answer',{method:'POST',body:JSON.stringify({answers:{income:'850000'}})})).status,200);
+ assert.equal((await (await s.request('/api/requests/'+created.id+'/status',{headers:{Authorization:'Bearer '+created.ownerToken}})).json()).answers.income,'850000');
+ }finally{await s.stop()}
+});

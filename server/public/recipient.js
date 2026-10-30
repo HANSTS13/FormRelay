@@ -1,4 +1,4 @@
-const id = location.pathname.split('/').pop();
+﻿const id = location.pathname.split('/').pop();
 const form = document.getElementById('response');
 const status = document.getElementById('status');
 const toggleBtn = document.getElementById('toggle-view');
@@ -16,7 +16,7 @@ async function load() {
     if (!r.ok) throw Error(data.error || 'Unavailable');
     if (data.submitted) {
       status.className = 'status-success';
-      status.innerHTML = '<h3>✓ Request Completed</h3><p style="margin-top:8px">This request has already been answered and relayed back to the original form.</p>';
+      status.innerHTML = '<h3>âœ“ Request Completed</h3><p style="margin-top:8px">This request has already been answered and relayed back to the original form.</p>';
       form.style.display = 'none';
       return;
     }
@@ -71,7 +71,7 @@ function renderFields() {
     if (useSimplified && f.isSimplified) {
       const badge = document.createElement('span');
       badge.className = 'ai-tag';
-      badge.textContent = `✨ AI Clarified ${f.aiConfidence ? `(${f.aiConfidence})` : ''}`;
+      badge.textContent = 'Local rule suggestion';
       labelRow.appendChild(badge);
     }
 
@@ -89,7 +89,7 @@ function renderFields() {
     if (f.aiHint) {
       const hint = document.createElement('div');
       hint.className = 'ai-hint-box';
-      hint.innerHTML = `<span>💡</span><div><strong>AI Guidance:</strong> ${escapeHtml(f.aiHint)}</div>`;
+      hint.innerHTML = `<span>ðŸ’¡</span><div><strong>AI Guidance:</strong> ${escapeHtml(f.aiHint)}</div>`;
       block.appendChild(hint);
     }
 
@@ -145,8 +145,8 @@ function renderFields() {
         mic.type = 'button';
         mic.className = 'mic-btn';
         mic.title = 'Speak answer (AI Voice Assistant)';
-        mic.innerHTML = '🎙️';
-        mic.onclick = () => startVoiceInput(mic, input);
+        mic.innerHTML = 'ðŸŽ™ï¸';
+        mic.onclick = () => {if(window.confirm('Your browser may send microphone audio to an online speech service. Use fictional data only. Continue?'))startVoiceInput(mic, input)};
         wrapper.appendChild(mic);
       }
     }
@@ -185,52 +185,12 @@ function renderFields() {
 }
 
 function validateField(f, el, pill) {
-  const val = el.value.trim();
-  if (!val) {
-    pill.className = 'validation-pill';
-    pill.textContent = '';
-    return;
-  }
-
-  const key = f.key.toLowerCase();
-  const label = (f.label || '').toLowerCase();
-
-  if (f.type === 'tel' || key.includes('phone') || label.includes('phone') || label.includes('telephonic')) {
-    const cleanDigits = val.replace(/\D/g, '');
-    if (cleanDigits.length >= 10) {
-      pill.className = 'validation-pill valid';
-      pill.innerHTML = `✓ Valid phone number format (${cleanDigits.length} digits)`;
-      return;
-    }
-  }
-
-  if (f.type === 'number' || key.includes('income') || label.includes('remuneration') || label.includes('income')) {
-    const num = parseFloat(val);
-    if (!isNaN(num) && num > 0) {
-      pill.className = 'validation-pill valid';
-      pill.innerHTML = `✓ Valid annual income: ₹${num.toLocaleString('en-IN')}`;
-      return;
-    }
-  }
-
-  if (key.includes('name') || label.includes('name') || label.includes('surname')) {
-    if (val.includes(' ') && val.length >= 4) {
-      pill.className = 'validation-pill valid';
-      pill.innerHTML = `✓ Full legal name recognized`;
-      return;
-    }
-  }
-
-  if (f.type === 'select' && val) {
-    pill.className = 'validation-pill valid';
-    pill.innerHTML = `✓ Option selected`;
-    return;
-  }
-
-  pill.className = 'validation-pill valid';
-  pill.innerHTML = `✓ Ready for submission`;
+  const value=el.value.trim();
+  if(!value){pill.className='validation-pill';pill.textContent='';return;}
+  const valid=el.checkValidity() && (f.type!=='tel'||/^[+()0-9 .-]{3,40}$/.test(value));
+  pill.className='validation-pill valid';
+  pill.textContent=valid?'Format checks passed. Review for accuracy.':'Review this answer’s format before sending.';
 }
-
 function startVoiceInput(micBtn, targetInput) {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) return;
@@ -241,7 +201,7 @@ function startVoiceInput(micBtn, targetInput) {
   recognition.maxAlternatives = 1;
 
   micBtn.classList.add('listening');
-  micBtn.innerHTML = '🔴';
+  micBtn.innerHTML = 'ðŸ”´';
 
   recognition.onresult = (event) => {
     const transcript = event.results[0][0].transcript;
@@ -253,12 +213,12 @@ function startVoiceInput(micBtn, targetInput) {
 
   recognition.onerror = () => {
     micBtn.classList.remove('listening');
-    micBtn.innerHTML = '🎙️';
+    micBtn.innerHTML = 'ðŸŽ™ï¸';
   };
 
   recognition.onend = () => {
     micBtn.classList.remove('listening');
-    micBtn.innerHTML = '🎙️';
+    micBtn.innerHTML = 'ðŸŽ™ï¸';
   };
 
   recognition.start();
@@ -268,7 +228,7 @@ function startVoiceInput(micBtn, targetInput) {
 if (toggleBtn) {
   toggleBtn.addEventListener('click', () => {
     useSimplified = !useSimplified;
-    toggleBtn.textContent = useSimplified ? '🔄 Show Original Legal Labels' : '✨ Show AI Simplified Labels';
+    toggleBtn.textContent = useSimplified ? 'ðŸ”„ Show Original Legal Labels' : 'âœ¨ Show AI Simplified Labels';
     renderFields();
   });
 }
@@ -300,7 +260,7 @@ form.addEventListener('submit', async (e) => {
 
     status.className = 'status-success';
     status.innerHTML = `
-      <h3>✓ Successfully Submitted!</h3>
+      <h3>âœ“ Successfully Submitted!</h3>
       <p style="margin-top:6px; font-size: 0.95rem;">Your answers have been securely transferred. The student's original form will automatically populate in real time.</p>
     `;
   } catch (e) {

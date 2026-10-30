@@ -4,6 +4,8 @@ For the latest Fields / Requests / Settings UI, tab/document isolation, repeated
 
 For the current hackathon presentation, follow [LOCAL_DEMO.md](LOCAL_DEMO.md) for the two-tab localhost workflow, optional same-Wi-Fi phone access, and troubleshooting. Production configuration remains available for future use.
 
+Aibin's recipient-side assistance is integrated in the maintained app. See [AI_ASSISTANCE.md](AI_ASSISTANCE.md) for local guidance, progress, format feedback, optional browser speech input and privacy limitations.
+
 Controlled demo, **not** production software. Use fictional data only. It has no recipient identity verification, application encryption at rest, or comprehensive field classification. Optional SQLite persistence and deployment safeguards are documented in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Run locally

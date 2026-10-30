@@ -5,6 +5,7 @@ const path=require('path');
 const {rateLimit}=require('express-rate-limit');
 const {createStore}=require('./store');
 const {definitions,validateAnswers}=require('./fields');
+const {enhanceFieldsWithAI}=require('./ai');
 
 function createApp(env=process.env){
 const production=env.NODE_ENV==='production';
@@ -64,7 +65,7 @@ app.get('/recipient.js',(req,res)=>res.sendFile(path.join(__dirname,'public','re
 app.post('/api/requests',createLimit,authorizeCreation,(req,res)=>{
   clean();
   if(store.count()>=1000)return res.status(503).json({error:'Demo capacity reached; try again after requests expire'});
-  let fields;try{fields=definitions(req.body?.fields)}catch(error){return res.status(400).json({error:error.message})}
+  let fields;try{fields=enhanceFieldsWithAI(definitions(req.body?.fields))}catch(error){return res.status(400).json({error:error.message})}
   const id=crypto.randomBytes(16).toString('hex');
   const ownerToken=crypto.randomBytes(32).toString('hex');
   const expiresAt=Date.now()+TTL;
