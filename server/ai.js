@@ -33,6 +33,57 @@ async function groupFieldsByPerson(fields) {
       : {})
   }));
 
+  // FAST PATH: Instant sub-millisecond semantic segregation for team/member forms
+  const groupsMap = new Map();
+  let hasMemberPattern = false;
+
+  for (const f of sanitized) {
+    const text = f.label;
+    const matchMember = text.match(/(?:team\s*)?member\s*(\d+)/i) || text.match(/participant\s*(\d+)/i) || text.match(/person\s*(\d+)/i);
+    if (matchMember) {
+      hasMemberPattern = true;
+      const gName = 'Team Member ' + matchMember[1];
+      if (!groupsMap.has(gName)) groupsMap.set(gName, []);
+      groupsMap.get(gName).push(f);
+    } else if (/\bleader\b|\bcaptain\b/i.test(text)) {
+      hasMemberPattern = true;
+      const gName = 'Team Leader';
+      if (!groupsMap.has(gName)) groupsMap.set(gName, []);
+      groupsMap.get(gName).push(f);
+    } else if (/\bguardian\b|\bfather\b|\bmother\b|\bparent\b/i.test(text)) {
+      hasMemberPattern = true;
+      const gName = 'Parent / Guardian';
+      if (!groupsMap.has(gName)) groupsMap.set(gName, []);
+      groupsMap.get(gName).push(f);
+    } else if (/\bstudent\b|\bapplicant\b/i.test(text)) {
+      hasMemberPattern = true;
+      const gName = 'Student';
+      if (!groupsMap.has(gName)) groupsMap.set(gName, []);
+      groupsMap.get(gName).push(f);
+    }
+  }
+
+  if (hasMemberPattern && groupsMap.size >= 2) {
+    const groups = [];
+    for (const [groupName, groupFields] of groupsMap) {
+      groups.push({
+        groupName,
+        description: `Questions to be answered by ${groupName}`,
+        fields: groupFields
+      });
+    }
+    const usedKeys = new Set(groups.flatMap(g => g.fields.map(f => f.key)));
+    const remaining = sanitized.filter(f => !usedKeys.has(f.key));
+    if (remaining.length > 0) {
+      groups.push({
+        groupName: 'General Details',
+        description: 'Remaining form questions',
+        fields: remaining
+      });
+    }
+    return { ok: true, model: 'instant-ai-matcher', groups };
+  }
+
   const prompt = `You are a smart form automation AI for FormRelay.
 
 Your job is to SEGREGATE form fields by WHO needs to fill them out. Each group will receive a SEPARATE QR code and link so different individuals can fill their own details remotely.
@@ -63,7 +114,11 @@ ${JSON.stringify(sanitized, null, 2)}`;
 
   const body = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 0.1,
+      thinkingConfig: { thinkingBudget: 0 }
+    }
   };
 
   const models = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];

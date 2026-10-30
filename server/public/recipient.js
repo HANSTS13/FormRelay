@@ -122,6 +122,21 @@ function renderFields() {
         validateField(f, select, valPill);
       });
       wrapper.appendChild(select);
+    } else if (f.type === 'textarea') {
+      const textarea = document.createElement('textarea');
+      textarea.id = f.key;
+      textarea.name = f.key;
+      textarea.required = true;
+      textarea.rows = 3;
+      textarea.maxLength = 500;
+      textarea.style.cssText = 'width: 100%; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px; font-family: inherit; font-size: 0.95rem;';
+      textarea.placeholder = `Enter ${useSimplified ? (f.simplifiedLabel || f.label) : f.label}...`;
+      if (currentValues[f.key]) textarea.value = currentValues[f.key];
+      textarea.addEventListener('input', () => {
+        updateProgress();
+        validateField(f, textarea, valPill);
+      });
+      wrapper.appendChild(textarea);
     } else {
       const input = document.createElement('input');
       input.id = f.key;
