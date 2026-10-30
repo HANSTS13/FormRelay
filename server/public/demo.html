@@ -126,11 +126,11 @@
 <body>
   <div class="container">
     <div class="header">
-      <span class="tag">Hackathon Demo</span>
+      <span class="tag">FormRelay AI Demo</span>
       <h1>Scholarship Application Portal</h1>
-      <p class="desc">A standard official application containing bureaucratic questions that require parental or guardian inputs.</p>
+      <p class="desc">A standard official application containing applicant, parental, and institution verification fields.</p>
       <div class="notice">
-        💡 <strong>How to test FormRelay:</strong> Activate the extension, click <strong>Select fields</strong>, select the guardian questions below, and click <strong>Create remote request</strong>. Watch how FormRelay's AI simplifies the questions on the recipient's phone!
+        ✨ <strong>AI Smart Detection:</strong> Click the FormRelay extension icon and choose <strong>AI Analyze Form</strong>. The AI model will classify these questions into <em>Applicant</em>, <em>Parent / Guardian</em>, and <em>Institution</em> automatically!
       </div>
     </div>
 
@@ -138,21 +138,21 @@
       <form onsubmit="event.preventDefault(); alert('Demo submitted! No personal data was transferred.');">
         <div class="section-title">Applicant Information</div>
         <label>
-          Student Full Legal Name
+          Student Name
           <input id="student_name" type="text" value="Alex M. Rivera">
         </label>
 
-        <div class="section-title">Guardian & Family Attestation (Confusing / Bureaucratic Questions)</div>
+        <div class="section-title">Parent / Guardian Information</div>
         <label>
-          Guardian Legal Surname & Given Designation
-          <span class="hint">Official name as recorded in registry documents</span>
-          <input id="guardian_name" type="text">
+          Guardian Occupation
+          <span class="hint">Current employment, vocation, or professional livelihood</span>
+          <input id="guardian_job" type="text">
         </label>
 
         <label>
-          Primary Kinship / Custodial Affiliation
+          Guardian Relationship
           <select id="guardian_relation">
-            <option value="">-- Specify Affiliation --</option>
+            <option value="">-- Specify Relationship --</option>
             <option value="Mother">Mother</option>
             <option value="Father">Father</option>
             <option value="Legal Guardian">Legal Guardian</option>
@@ -162,20 +162,22 @@
         </label>
 
         <label>
-          Current Vocation / Professional Livelihood
-          <span class="hint">Nature of employment or primary economic engagement</span>
-          <input id="guardian_job" type="text">
+          Father's Annual Income
+          <span class="hint">Gross annual household remuneration before taxes (INR)</span>
+          <input id="family_income" type="number">
         </label>
 
         <label>
-          Telephonic Contact Number with Area Prefix
+          Parent Contact Number
+          <span class="hint">Telephonic contact number with area prefix</span>
           <input id="guardian_phone" type="tel">
         </label>
 
+        <div class="section-title">Institution Verification</div>
         <label>
-          Gross Annual Aggregate Household Remuneration (INR)
-          <span class="hint">Official pre-tax fiscal compensation across all household earners</span>
-          <input id="family_income" type="number">
+          College Verification Number
+          <span class="hint">Institutional AISHE/AISCE registry identification code</span>
+          <input id="college_code" type="text" value="COL-REG-84920">
         </label>
 
         <button type="submit">Submit Completed Scholarship Application</button>

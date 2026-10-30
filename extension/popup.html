@@ -1,1 +1,130 @@
-<!doctype html><html><head><meta charset="utf-8"><style>body{font:14px system-ui;width:340px;padding:14px}h2{margin:2px 0 10px}input{width:100%;box-sizing:border-box;padding:9px;margin:7px 0}button{padding:10px;margin:5px 3px 5px 0;border:0;border-radius:7px;background:#275ee1;color:white;cursor:pointer}button:disabled{opacity:.4}#fields{white-space:pre-wrap;border:1px solid #ddd;padding:8px;margin:10px 0}#qr{width:150px;display:none}#link{word-break:break-all}small{color:#555}</style></head><body><h2>FormRelay</h2><small>Demo only. Don't use private or sensitive data.</small><label>Backend URL<input id="base" value="http://localhost:3000"></label><button id="select">1. Select fields</button><button id="finish">2. Finish selection</button><div id="fields">No fields selected</div><button id="create">3. Create remote request</button><p id="message"></p><img id="qr" alt="Request QR code"><p><a target="_blank" id="link"></a></p><button id="undo">Undo filled answers</button><script src="popup.js"></script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>FormRelay</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font: 13px system-ui, sans-serif; width: 400px; padding: 14px; color: #1e293b; }
+    h2 { font-size: 1.1rem; margin-bottom: 3px; }
+    .sub { font-size: 0.72rem; color: #64748b; margin-bottom: 12px; display: block; }
+    label { font-size: 0.78rem; font-weight: 600; color: #475569; }
+    input[type="text"] { width: 100%; padding: 7px 10px; margin: 4px 0 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.83rem; }
+    button { padding: 8px 12px; border: none; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-ai { width: 100%; padding: 11px; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; border-radius: 8px; margin-bottom: 10px; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn-row { display: flex; gap: 6px; margin-bottom: 8px; }
+    .btn-row button { flex: 1; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+    .btn-row button:hover:not(:disabled) { background: #e2e8f0; }
+    #create { width: 100%; padding: 10px; background: #2563eb; color: white; margin-top: 4px; }
+    #create:hover { background: #1d4ed8; }
+    #fields { white-space: pre-wrap; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 6px; padding: 8px; margin: 8px 0; max-height: 100px; overflow-y: auto; font-size: 0.8rem; color: #334155; }
+    #message { margin: 6px 0; font-size: 0.8rem; color: #0284c7; word-break: break-word; }
+    .qr-wrap { text-align: center; margin: 8px 0; }
+    #qr { width: 140px; display: none; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; }
+    #link { word-break: break-all; font-size: 0.78rem; color: #2563eb; display: inline-block; margin-top: 4px; }
+    #undo { width: 100%; margin-top: 8px; background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; }
+
+    /* ── AI Group Panel ─────────────────────────────── */
+    #ai-panel { display: none; background: #f5f3ff; border: 1px solid #c4b5fd; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+    .ai-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .ai-title { font-weight: 700; color: #4c1d95; font-size: 0.88rem; }
+    .ai-close { background: white; border: 1px solid #ddd6fe; color: #6d28d9; padding: 3px 8px; font-size: 0.75rem; border-radius: 5px; }
+
+    /* Approval Step */
+    #ai-approval { display: none; }
+    .approval-box { background: white; border: 1px solid #ddd6fe; border-radius: 8px; padding: 10px; font-size: 0.82rem; color: #334155; margin-bottom: 8px; }
+    .approval-box p { margin-top: 6px; font-size: 0.75rem; color: #64748b; }
+    .confirm-row { display: flex; gap: 6px; }
+    .btn-confirm { background: #4f46e5; color: white; flex: 1; }
+    .btn-cancel { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; flex: 1; }
+
+    /* Loading */
+    #ai-loading { display: none; text-align: center; padding: 14px; color: #4f46e5; font-weight: 600; font-size: 0.85rem; }
+
+    /* Group Results */
+    #ai-results { display: none; }
+    .group-card { background: white; border: 1.5px solid #ddd6fe; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+    .group-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .group-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: #4f46e5; }
+    .group-name { font-weight: 700; font-size: 0.9rem; color: #3730a3; }
+    .group-desc { font-size: 0.74rem; color: #64748b; margin-bottom: 6px; }
+    .group-fields-list { padding-left: 12px; }
+    .group-field-item { font-size: 0.8rem; color: #1e293b; padding: 2px 0; display: flex; align-items: center; gap: 4px; }
+    .field-type-tag { font-size: 0.67rem; background: #e0e7ff; color: #3730a3; padding: 1px 5px; border-radius: 8px; }
+    .qr-mini { width: 80px; margin-top: 6px; display: none; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px; }
+    .group-link { font-size: 0.72rem; word-break: break-all; color: #2563eb; display: block; margin-top: 3px; }
+    .btn-create-group { margin-top: 6px; width: 100%; background: #4f46e5; color: white; padding: 7px; border-radius: 6px; font-size: 0.8rem; }
+    .btn-create-group:hover { background: #4338ca; }
+    .group-status { font-size: 0.78rem; color: #059669; margin-top: 4px; }
+    .ai-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .ai-actions button { flex: 1; font-size: 0.78rem; }
+    .btn-use-selected { background: #059669; color: white; }
+    .btn-skip-ai { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+  </style>
+</head>
+<body>
+  <h2>FormRelay</h2>
+  <span class="sub">AI-powered collaborative form delegation</span>
+
+  <label for="base">Backend URL</label>
+  <input id="base" type="text" value="http://localhost:3000">
+
+  <!-- ✨ AI Smart Group Button -->
+  <button id="btn-ai-group" class="btn-ai" type="button">
+    ✨ AI Smart Group Fields
+  </button>
+
+  <!-- AI Panel -->
+  <div id="ai-panel">
+    <div class="ai-panel-header">
+      <span class="ai-title">🤖 AI Field Grouping</span>
+      <button class="ai-close" id="ai-close" type="button">✕ Close</button>
+    </div>
+
+    <!-- Step 1: Approval -->
+    <div id="ai-approval">
+      <div class="approval-box">
+        <strong id="ai-scan-summary">Found form fields on this page.</strong>
+        <p>The AI will group them by WHO should fill them in, and generate separate QR links for each group. Only question titles are sent — no passwords or entered values.</p>
+      </div>
+      <div class="confirm-row">
+        <button id="ai-confirm" class="btn-confirm" type="button">Group with AI</button>
+        <button id="ai-cancel" class="btn-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Loading -->
+    <div id="ai-loading">
+      ✨ AI is analyzing and grouping fields...<br>
+      <small style="color:#7c3aed">Using Gemini to find natural field groups</small>
+    </div>
+
+    <!-- Step 3: Results -->
+    <div id="ai-results">
+      <p style="font-size:0.78rem;color:#475569;margin-bottom:8px;">AI grouped your form fields. Create a separate QR for each group:</p>
+      <div id="group-cards-container"></div>
+      <div class="ai-actions">
+        <button id="btn-skip-ai" class="btn-skip-ai" type="button">Ignore AI — Manual select</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual Controls -->
+  <div class="btn-row">
+    <button id="select" type="button">1. Manual Select</button>
+    <button id="finish" type="button">2. Finish</button>
+  </div>
+  <div id="fields">No fields selected yet</div>
+  <button id="create" type="button">3. Create QR / Link</button>
+
+  <p id="message"></p>
+  <div class="qr-wrap">
+    <img id="qr" alt="QR code">
+    <p><a target="_blank" id="link"></a></p>
+  </div>
+  <button id="undo" type="button">Undo filled answers</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
