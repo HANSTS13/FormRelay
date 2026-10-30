@@ -18,7 +18,7 @@ app.post('/api/requests',(req,res)=>{
   clean();
   const fields=req.body?.fields;
   if(!Array.isArray(fields)||fields.length<1||fields.length>20)return res.status(400).json({error:'Select 1-20 fields'});
-  if(!fields.every(f=>typeof f.key==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(f.key)&&typeof f.label==='string'&&f.label.length>0&&f.label.length<=100&&['text','tel','email','number','date'].includes(f.type)))return res.status(400).json({error:'Unsupported fields'});
+  if(!fields.every(f=>typeof f.key==='string'&&/^[a-zA-Z0-9_-]{1,80}$/.test(f.key)&&typeof f.label==='string'&&f.label.length>0&&f.label.length<=100&&['text','tel','email','number','date','select'].includes(f.type)))return res.status(400).json({error:'Unsupported fields'});
   if(new Set(fields.map(f=>f.key)).size!==fields.length)return res.status(400).json({error:'Duplicate field keys'});
   const id=crypto.randomBytes(16).toString('hex');
   const ownerToken=crypto.randomBytes(32).toString('hex');
