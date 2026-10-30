@@ -13,97 +13,97 @@
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background-color: #f4f5f7;
-      color: #1e293b;
-      line-height: 1.5;
-      font-size: 15px;
+      background-color: #0d1216;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(13, 148, 136, 0.22) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(212, 185, 150, 0.15) 0px, transparent 50%),
+        radial-gradient(at 80% 15%, rgba(30, 41, 59, 0.55) 0px, transparent 55%),
+        linear-gradient(180deg, #0d1216 0%, #131a20 50%, #0b0f12 100%);
+      background-attachment: fixed;
+      color: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px 16px;
       -webkit-font-smoothing: antialiased;
-      padding: 0 0 40px 0;
     }
 
-    /* Official Portal Top Header */
-    .gov-banner {
-      background-color: #0f2744;
-      color: #ffffff;
-      padding: 10px 20px;
-      border-bottom: 3px solid #005ea2;
-      font-size: 13px;
+    .container {
+      width: 100%;
+      max-width: 540px;
     }
 
-    .gov-banner-inner {
-      max-width: 640px;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-    }
-
-    .gov-banner-title {
+    .header-tag {
+      text-align: center;
+      font-size: 12px;
       font-weight: 700;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      color: #d4b996;
+      margin-bottom: 14px;
     }
 
-    .gov-badge {
-      background-color: #1e3a5f;
-      color: #e2e8f0;
-      padding: 2px 8px;
-      border-radius: 3px;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      border: 1px solid #2d4f7c;
-    }
-
-    .page-container {
-      max-width: 640px;
-      margin: 28px auto 0;
-      padding: 0 16px;
-    }
-
-    /* Main Form Card */
     main {
-      background-color: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-top: 4px solid #005ea2;
-      border-radius: 4px;
-      padding: 32px 28px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      background: rgba(18, 24, 30, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(212, 185, 150, 0.08);
+      border-radius: 12px;
+      padding: 38px 34px;
+      position: relative;
     }
 
     h2 {
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 700;
-      color: #0f172a;
-      letter-spacing: -0.01em;
-      margin-bottom: 12px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid #e2e8f0;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #ffffff;
+      text-align: center;
+      margin-bottom: 22px;
+      position: relative;
+      padding-bottom: 14px;
     }
 
-    /* Official Notice Box */
+    h2::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 44px;
+      height: 2px;
+      background: linear-gradient(90deg, #14b8a6, #d4b996);
+    }
+
+    /* Notice banner */
     .notice {
-      background-color: #eff6ff;
-      border-left: 4px solid #005ea2;
-      padding: 12px 16px;
-      margin-bottom: 24px;
+      background: rgba(15, 23, 42, 0.65);
+      border-left: 3px solid #14b8a6;
+      border-radius: 4px;
+      padding: 13px 16px;
+      margin-bottom: 26px;
       font-size: 13.5px;
-      color: #1e3a8a;
       line-height: 1.5;
+      color: #cbd5e1;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     .notice strong {
       display: block;
-      color: #172554;
+      color: #d4b996;
+      font-size: 11px;
       font-weight: 700;
-      margin-bottom: 2px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
     }
 
-    /* Form Elements */
     #response {
       display: flex;
       flex-direction: column;
@@ -112,145 +112,157 @@
 
     label {
       display: block;
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 600;
-      color: #1e293b;
-      margin-bottom: 6px;
+      letter-spacing: 0.03em;
+      color: #f1f5f9;
+      margin-bottom: 7px;
     }
 
     input, select, textarea {
       width: 100%;
-      padding: 10px 12px;
+      padding: 12px 14px;
       font-family: inherit;
-      font-size: 15px;
-      color: #0f172a;
-      background-color: #ffffff;
-      border: 1.5px solid #64748b;
-      border-radius: 4px;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      font-size: 14.5px;
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 6px;
       outline: none;
+      transition: all 0.2s ease;
+      box-sizing: border-box;
+    }
+
+    input::placeholder, textarea::placeholder {
+      color: #94a3b8;
     }
 
     input:hover, select:hover, textarea:hover {
-      border-color: #334155;
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(212, 185, 150, 0.4);
     }
 
     input:focus, select:focus, textarea:focus {
-      border-color: #005ea2;
-      box-shadow: 0 0 0 3px rgba(0, 94, 162, 0.2);
+      background: rgba(255, 255, 255, 0.12);
+      border-color: #14b8a6;
+      box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.25);
     }
 
     input[type="checkbox"], input[type="radio"] {
-      width: 18px;
-      height: 18px;
-      margin-right: 8px;
+      width: 17px;
+      height: 17px;
+      margin-right: 9px;
       vertical-align: middle;
       cursor: pointer;
-      accent-color: #005ea2;
+      accent-color: #14b8a6;
     }
 
     textarea {
-      min-height: 90px;
+      min-height: 100px;
       resize: vertical;
     }
 
     select {
       cursor: pointer;
-      background-color: #ffffff;
+      background-color: #1a2228;
     }
 
     fieldset {
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
-      padding: 14px 16px;
-      background-color: #f8fafc;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      padding: 15px 16px;
+      background: rgba(255, 255, 255, 0.03);
     }
 
     legend {
-      font-size: 14px;
+      font-size: 13.5px;
       font-weight: 600;
-      color: #1e293b;
+      color: #d4b996;
       padding: 0 6px;
+      letter-spacing: 0.03em;
     }
 
     fieldset label {
       display: flex;
       align-items: center;
       font-weight: normal;
-      font-size: 14.5px;
+      font-size: 14px;
       margin-top: 8px;
       cursor: pointer;
     }
 
     button[type="submit"] {
-      background-color: #00703c;
+      background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
       color: #ffffff;
       font-family: inherit;
-      font-size: 15px;
+      font-size: 13.5px;
       font-weight: 700;
-      padding: 12px 24px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 14px 24px;
       border: none;
-      border-radius: 4px;
-      box-shadow: 0 2px 0 #002d18;
+      border-radius: 6px;
       cursor: pointer;
-      margin-top: 8px;
-      align-self: flex-start;
-      transition: background-color 0.15s ease;
+      margin-top: 10px;
+      width: 100%;
+      box-shadow: 0 4px 16px rgba(13, 148, 136, 0.35);
+      transition: all 0.2s ease;
     }
 
     button[type="submit"]:hover:not(:disabled) {
-      background-color: #005a30;
+      background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+      box-shadow: 0 6px 22px rgba(20, 184, 166, 0.45);
+      transform: translateY(-1px);
     }
 
     button[type="submit"]:active:not(:disabled) {
-      background-color: #004323;
-      transform: translateY(1px);
-      box-shadow: none;
+      transform: translateY(0);
+      box-shadow: 0 2px 8px rgba(13, 148, 136, 0.35);
     }
 
     button[type="submit"]:disabled {
-      background-color: #94a3b8;
+      background: #475569;
       box-shadow: none;
       cursor: not-allowed;
+      opacity: 0.7;
     }
 
     #status:not(:empty) {
-      margin-top: 20px;
-      padding: 14px 16px;
-      border-left: 4px solid #00703c;
-      background-color: #f0fdf4;
-      color: #14532d;
-      font-size: 14.5px;
+      margin-top: 22px;
+      padding: 16px;
+      border-radius: 6px;
+      background: rgba(20, 184, 166, 0.15);
+      border: 1px solid #14b8a6;
+      color: #5eead4;
       font-weight: 600;
+      font-size: 14px;
+      text-align: center;
+      animation: fadeIn 0.3s ease;
     }
 
     .footer-meta {
-      margin-top: 24px;
+      margin-top: 22px;
       text-align: center;
       font-size: 12px;
       color: #64748b;
+      letter-spacing: 0.05em;
       line-height: 1.6;
     }
 
-    @media (max-width: 520px) {
-      main {
-        padding: 24px 18px;
-      }
-      button[type="submit"] {
-        width: 100%;
-      }
+    .footer-meta strong {
+      color: #d4b996;
+      font-weight: 600;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
     }
   </style>
 </head>
 <body>
-  <div class="gov-banner">
-    <div class="gov-banner-inner">
-      <span class="gov-banner-title">FormRelay Secure Submission</span>
-      <span class="gov-badge">Encrypted Session</span>
-    </div>
-  </div>
-
-  <div class="page-container">
+  <div class="container">
+    <div class="header-tag">FormRelay Secure Submission</div>
     <main>
       <h2>Complete requested fields</h2>
       <div class="notice">
@@ -261,8 +273,7 @@
       <div id="status"></div>
     </main>
     <div class="footer-meta">
-      <p>Official Ephemeral Form Supplement • Single-use transmission link</p>
-      <p>Your responses are securely relayed only to the active application form and expire in 30 minutes.</p>
+      <p>Single-use transmission link • <strong>Auto-expires in 30 minutes</strong></p>
     </div>
   </div>
   <script src="/recipient.js"></script>
