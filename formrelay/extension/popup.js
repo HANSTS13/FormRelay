@@ -1,4 +1,4 @@
-﻿const $ = id => document.getElementById(id);
+const $ = id => document.getElementById(id);
 let tabId = null, state = null, busy = false, epoch = 0, refreshTimer = null;
 let history = [], viewRequestId = null, viewTabId = null;
 const labels={waiting:'Pending',received:'Response Received',completed:'Autofilled',partial:'Partially Failed',expired:'Expired',unavailable:'Original Form Unavailable',unauthorized:'Access denied',offline:'Pending - reconnecting'};
@@ -121,25 +121,32 @@ chrome.tabs.onUpdated?.addListener((id,change)=>{if(id===tabId&&change.status===
 (async()=>{const saved=await chrome.storage.local.get('formrelayBase');$('base').value=saved.formrelayBase||'http://localhost:3000';const access=(await chrome.storage.session.get('formrelayAccess')).formrelayAccess;if(access?.origin===$('base').value)$('accessKey').value=access.key;await refresh()})().catch(error=>notify(error.message,'error'));
 setInterval(expiry,1000);
 
-
 // =============================================================
 // AI Smart Field Grouping Feature
 // =============================================================
 let scannedFields = [];
 let aiGroups = [];
 
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 const aiBtn = $('btn-ai-group');
 if (aiBtn) {
   aiBtn.onclick = async () => {
     try {
-      notify('Scanning webpage fields for AI analysis...', 'loading');
+      notify('Scanning webpage fields for AI segregation...', 'loading');
       await ensure();
       const res = await content('SCAN_FIELDS');
       if (!res?.ok || !res.fields?.length) {
-        throw new Error('No supported form questions found on this page. Navigate to http://localhost:3000/demo first.');
+        throw new Error('No supported form questions found on this page. Navigate to your form first.');
       }
       scannedFields = res.fields;
-      $('ai-scan-summary').textContent = 'Found ' + scannedFields.length + ' supported questions on this form.';
+      $('ai-scan-summary').textContent = 'Found ' + scannedFields.length + ' questions on this form.';
       $('ai-panel').style.display = 'block';
       $('ai-approval').style.display = 'block';
       $('ai-loading').style.display = 'none';
@@ -189,7 +196,7 @@ if ($('ai-confirm')) {
 
       renderAiGroupCards(aiGroups, origin);
       $('ai-results').style.display = 'block';
-      notify('AI identified ' + aiGroups.length + ' group(s). Click below to create QR.');
+      notify('AI segregated ' + aiGroups.length + ' group(s). Create QR/link for each member below.');
     } catch (err) {
       $('ai-loading').style.display = 'none';
       $('ai-approval').style.display = 'block';
@@ -202,52 +209,113 @@ function renderAiGroupCards(groups, origin) {
   const container = $('group-cards-container');
   container.replaceChildren();
 
+  // Top action: generate for all groups at once
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = 'button primary wide';
+  allBtn.style.cssText = 'background: #0d6b61; margin-bottom: 12px; font-weight: 700; font-size: 11px; min-height: 34px;';
+  allBtn.textContent = '⚡ Generate QRs for All Groups (' + groups.length + ')';
+  allBtn.onclick = async () => {
+    allBtn.disabled = true;
+    allBtn.textContent = 'Generating all QRs...';
+    for (let i = 0; i < groups.length; i++) {
+      await createQrForGroupCard(groups[i], i, origin);
+    }
+    allBtn.textContent = '✓ All QRs Generated!';
+  };
+  container.appendChild(allBtn);
+
   groups.forEach((g, idx) => {
     const card = document.createElement('div');
-    card.style.cssText = 'background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 8px; font-size: 11px;';
-    
-    const title = document.createElement('div');
-    title.style.cssText = 'font-weight: 700; color: #1e1b4b; font-size: 12px; margin-bottom: 4px;';
-    title.textContent = '👥 ' + g.groupName;
+    card.style.cssText = 'background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
+
+    const header = document.createElement('div');
+    header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;';
+    header.innerHTML = '<strong style="font-size: 13px; color: #1e1b4b;">👥 ' + escapeHtml(g.groupName) + '</strong><span style="font-size: 10px; background: #e0e7ff; color: #3730a3; padding: 2px 7px; border-radius: 10px; font-weight: 600;">' + (g.fields || []).length + ' questions</span>';
 
     const desc = document.createElement('div');
-    desc.style.cssText = 'color: #64748b; font-size: 10px; margin-bottom: 6px;';
+    desc.style.cssText = 'color: #64748b; font-size: 10px; margin-bottom: 8px;';
     desc.textContent = g.description || '';
 
     const list = document.createElement('div');
-    list.style.cssText = 'padding-left: 6px; margin-bottom: 8px;';
+    list.style.cssText = 'padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 10px; font-size: 11px;';
     (g.fields || []).forEach(f => {
       const item = document.createElement('div');
-      item.style.cssText = 'padding: 2px 0; color: #334155;';
-      item.textContent = '• ' + f.label + ' (' + (f.type || 'text') + ')';
+      item.style.cssText = 'padding: 2px 0; color: #334155; display: flex; justify-content: space-between; align-items: center;';
+      item.innerHTML = '<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px;">• ' + escapeHtml(f.label) + '</span><small style="color: #64748b; margin-left: 6px;">' + escapeHtml(f.type || 'text') + '</small>';
       list.appendChild(item);
     });
 
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'button primary wide';
-    btn.style.cssText = 'background: #4f46e5; font-size: 11px; min-height: 32px; margin-top: 4px;';
-    btn.textContent = 'Create QR for ' + g.groupName;
-    btn.onclick = async () => {
-      btn.disabled = true;
-      btn.textContent = 'Creating QR...';
-      try {
-        const keys = (g.fields || []).map(f => f.key);
-        await content('SET_SELECTION', { keys });
-        const base = await saveSettings();
-        const result = await worker('CREATE_REQUEST', { base });
-        viewRequestId = result.request.id;
-        $('ai-panel').style.display = 'none';
-        section('requests');
-        notify('QR and link created for ' + g.groupName + '!');
-      } catch (e) {
-        btn.disabled = false;
-        btn.textContent = 'Create QR for ' + g.groupName;
-        notify(e.message, 'error');
-      }
-    };
+    const createBtn = document.createElement('button');
+    createBtn.id = 'ai-create-btn-' + idx;
+    createBtn.type = 'button';
+    createBtn.className = 'button primary wide';
+    createBtn.style.cssText = 'background: #4f46e5; font-size: 11px; min-height: 32px; font-weight: 600;';
+    createBtn.textContent = 'Generate QR / Link for ' + g.groupName;
+    createBtn.onclick = () => createQrForGroupCard(g, idx, origin);
 
-    card.append(title, desc, list, btn);
+    // Result frame for this specific group's QR & link
+    const resultBox = document.createElement('div');
+    resultBox.id = 'ai-result-box-' + idx;
+    resultBox.style.cssText = 'display: none; margin-top: 10px; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 10px; background: #fdfdfd; border-radius: 6px;';
+    resultBox.innerHTML = `
+      <div style="font-weight: 700; color: #0d6b61; font-size: 11px; margin-bottom: 6px;">QR for ${escapeHtml(g.groupName)}</div>
+      <img id="ai-qr-img-${idx}" style="width: 130px; height: 130px; border-radius: 6px; border: 1px solid #cbd5e1; padding: 4px; display: block; margin: 0 auto 8px auto; background: white;">
+      <a id="ai-link-${idx}" target="_blank" style="font-size: 10px; color: #2563eb; word-break: break-all; display: block; margin-bottom: 6px; text-decoration: underline;"></a>
+      <button id="ai-copy-btn-${idx}" type="button" class="button secondary wide" style="min-height: 28px; font-size: 10px;">📋 Copy Link for ${escapeHtml(g.groupName)}</button>
+      <div style="font-size: 10px; color: #059669; font-weight: 600; margin-top: 6px;">✓ Separate link ready to send!</div>
+    `;
+
+    card.append(header, desc, list, createBtn, resultBox);
     container.appendChild(card);
   });
+}
+
+async function createQrForGroupCard(g, idx, origin) {
+  const btn = document.getElementById('ai-create-btn-' + idx);
+  const resultBox = document.getElementById('ai-result-box-' + idx);
+  const qrImg = document.getElementById('ai-qr-img-' + idx);
+  const linkEl = document.getElementById('ai-link-' + idx);
+  const copyBtn = document.getElementById('ai-copy-btn-' + idx);
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Generating QR...';
+  }
+
+  try {
+    const keys = (g.fields || []).map(f => f.key);
+    await content('SET_SELECTION', { keys });
+
+    const base = await saveSettings();
+    const result = await worker('CREATE_REQUEST', { base });
+    const req = result.request;
+
+    if (btn) {
+      btn.textContent = '✓ ' + g.groupName + ' Link Created';
+      btn.style.background = '#059669';
+      btn.disabled = false;
+    }
+
+    if (resultBox && qrImg && linkEl) {
+      qrImg.src = base + '/api/requests/' + req.id + '/qr.png';
+      linkEl.href = req.url;
+      linkEl.textContent = req.url;
+      if (copyBtn) {
+        copyBtn.onclick = async () => {
+          await navigator.clipboard.writeText(req.url);
+          notify('Copied link for ' + g.groupName + '!');
+        };
+      }
+      resultBox.style.display = 'block';
+    }
+
+    notify('Created delegation link for ' + g.groupName + '!');
+  } catch (err) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Generate QR / Link for ' + g.groupName;
+    }
+    notify('Error: ' + err.message, 'error');
+  }
 }

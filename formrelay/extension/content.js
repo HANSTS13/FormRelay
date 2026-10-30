@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   const VERSION = '0.4.0';
   if (window.__formrelayInstance?.version === VERSION && window.__formrelayInstance.alive) return;
   if (window.__formrelayInstance) window.__formrelayInstance.dispose();
@@ -93,7 +93,7 @@
     const customSelect=!native(el)&&['combobox','listbox'].includes(type);if(customSelect)type='select';
     const refs = members(el);
     if(type==='checkbox'&&refs.length>1)type='checkbox-group';
-    const title=['radio','checkbox-group','checkbox','select'].includes(type)?question(el,label(el)):label(el);
+    const title = question(el, '') || label(el);
     const options = customSelect?customOptions(el):type === 'select' ? [...el.options].filter(option => option.value !== '' && !option.disabled && !option.closest('optgroup[disabled]')).map((option, i) => ({value: 'choice_' + i, label: normalized(option.label), actual: option.value, node: option})) : (type === 'radio'||type==='checkbox-group') ? refs.map((radio, i) => ({value: 'choice_' + i, label: label(radio), actual: radio.value??radio.getAttribute('data-value')??label(radio), node: radio})) : null;
     if(options)for(const option of options){option.otherInput=otherInput(option,el);option.other=!!option.otherInput;const owner=option.node?.closest('label');option.otherIssue=!option.otherInput&&(!!(option.node?.getAttribute('data-other-input')||option.node?.getAttribute('aria-controls'))||/^other(?:\b|:)/i.test(option.label)&&!!owner?.querySelector('input:not([type=radio]):not([type=checkbox]),textarea'));}
     return {el, refs, type, customSelect,label: title, name: el.getAttribute('name') || '', id: el.id || '', form: el.form||el.closest('form'), step:location.href, path: path(el), required: refs.some(ref => ref.required||ref.getAttribute('aria-required')==='true'), options};
@@ -396,18 +396,21 @@
       if(msg.action==='SCAN_FIELDS'){
         const all = [], seen = new Set();
         const candidates = [...document.querySelectorAll(controls)];
+        let idx = 0;
         for (const el of candidates.slice(0, 100)) {
           if (seen.has(canonical(el))) continue;
           const f = describe(el);
           f.refs.forEach(ref => seen.add(ref));
           if (!reason(f)) {
-            const key = f.id || f.name || ('field_' + all.length);
+            const key = f.id ? 'id_' + f.id : f.name ? 'name_' + f.name : ('fld_' + idx);
             all.push({
               key,
+              idx,
               label: f.label,
               type: f.type,
               options: f.options ? f.options.map(o => ({ value: o.value, label: o.label })) : []
             });
+            idx++;
           }
         }
         reply({ ok: true, fields: all });
@@ -417,23 +420,27 @@
         stop();
         chosen.forEach(f => f.refs.forEach(restore));
         chosen = [];
-        const targetKeys = new Set(msg.keys || []);
+        const targetKeys = new Set((msg.keys || []).map(String));
         const candidates = [...document.querySelectorAll(controls)];
         const seen = new Set();
-        for (const el of candidates) {
+        let idx = 0;
+        for (const el of candidates.slice(0, 100)) {
           if (seen.has(canonical(el))) continue;
           const f = describe(el);
           f.refs.forEach(ref => seen.add(ref));
-          const key = f.id || f.name;
-          if (targetKeys.has(key) && !reason(f)) {
-            const chosenItem = {
-              ...f,
-              key: 'field_' + Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2,'0')).join(''),
-              state: 'selected',
-              detail: ''
-            };
-            chosen.push(chosenItem);
-            f.refs.forEach(ref => paint(ref, 'selected'));
+          if (!reason(f)) {
+            const key = f.id ? 'id_' + f.id : f.name ? 'name_' + f.name : ('fld_' + idx);
+            if (targetKeys.has(key) || targetKeys.has('fld_' + idx) || targetKeys.has(String(idx))) {
+              const chosenItem = {
+                ...f,
+                key: 'field_' + Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2,'0')).join(''),
+                state: 'selected',
+                detail: ''
+              };
+              chosen.push(chosenItem);
+              f.refs.forEach(ref => paint(ref, 'selected'));
+            }
+            idx++;
           }
         }
         update();

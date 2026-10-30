@@ -35,29 +35,30 @@ async function groupFieldsByPerson(fields) {
 
   const prompt = `You are a smart form automation AI for FormRelay.
 
-Analyze these form fields and GROUP them by who should fill them in. 
-For example:
-- If a hackathon registration form has fields for Team Member 1 (name, email, phone) and Team Member 2 (name, email, phone) — create two separate groups.
-- If a scholarship form has student fields and parent/guardian fields — create two groups.
-- If fields clearly belong to one person, put them in one group.
-- Give each group a short descriptive name like "Team Member 1", "Parent / Guardian", "Student", "Employer", etc.
+Your job is to SEGREGATE form fields by WHO needs to fill them out. Each group will receive a SEPARATE QR code and link so different individuals can fill their own details remotely.
 
-Rules:
-- Each field key must appear in exactly one group.
-- Group names should be human-readable and descriptive.
-- If all fields belong to one person, return one group.
-- Do NOT create groups for fields already on the page (like Student Name pre-filled by the applicant). Only group fields that need to be COLLECTED from another person.
+CRITICAL SEGREGATION RULES:
+1. If the form has fields for multiple team members (e.g. Member 1, Member 2, Team Member 1, Team Member 2, Leader vs Member) -> YOU MUST CREATE A SEPARATE GROUP FOR EACH MEMBER (e.g. "Team Member 1", "Team Member 2"). NEVER combine them into one group!
+2. If the form has fields for a student and parent/guardian -> CREATE SEPARATE GROUPS ("Student", "Parent / Guardian").
+3. If the form has fields for applicant, institution, employer -> SEPARATE EACH ENTITY into its own group.
+4. If a field prefix or label indicates "Member 1", "Member 2", "Participant 1", "Participant 2", "Person 1", "Person 2", "Student", "Guardian", "Parent", "Teacher", "Supervisor", ALWAYS separate them into distinct groups.
+5. EVERY field key from the input MUST appear in exactly one group. Do not drop any fields.
 
-Respond ONLY with valid JSON (no markdown):
+Respond ONLY with valid JSON array:
 [
   {
-    "groupName": "Group label here",
-    "description": "One sentence about who fills this",
-    "fields": ["key1", "key2", "key3"]
+    "groupName": "Team Member 1",
+    "description": "Details to be completed by Team Member 1",
+    "fields": ["key1", "key2"]
+  },
+  {
+    "groupName": "Team Member 2",
+    "description": "Details to be completed by Team Member 2",
+    "fields": ["key3", "key4"]
   }
 ]
 
-Form fields to group:
+Form fields to segregate:
 ${JSON.stringify(sanitized, null, 2)}`;
 
   const body = {
