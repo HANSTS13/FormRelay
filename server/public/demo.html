@@ -1,1 +1,186 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Demo Scholarship Form</title><style>body{font-family:system-ui;max-width:570px;margin:30px auto;padding:20px}label{display:block;margin-top:18px}input,select{box-sizing:border-box;display:block;width:100%;padding:12px;margin-top:6px;font-size:1rem;background:white;border:1px solid #767676;border-radius:4px}button{padding:12px;margin-top:24px;font-size:1rem;cursor:pointer}</style></head><body><h1>Scholarship Application (Demo)</h1><p>Use test data only. Activate FormRelay in Chrome to select guardian fields.</p><form onsubmit="event.preventDefault();alert('Demo submitted — no data was sent to a college.')"><label>Student Name<input id="student_name" type="text" value="Demo Student"></label><label>Guardian Full Name<input id="guardian_name" type="text"></label><label>Guardian Relationship<select id="guardian_relationship"><option value="">-- Select Relationship --</option><option value="Mother">Mother</option><option value="Father">Father</option><option value="Legal Guardian">Legal Guardian</option><option value="Grandparent">Grandparent</option><option value="Other">Other</option></select></label><label>Guardian Occupation<input id="guardian_job" type="text"></label><label>Guardian Phone<input id="guardian_phone" type="tel"></label><label>Annual Family Income<input id="family_income" type="number"></label><button type="submit">Submit demo</button></form></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scholarship Application (Demo)</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      padding: 36px 16px;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .header {
+      margin-bottom: 24px;
+    }
+    .tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: #eff6ff;
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    p.desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    .notice {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 0.88rem;
+      color: #1e40af;
+      margin-top: 14px;
+    }
+    .form-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 4px 20px -2px rgba(0,0,0,0.05);
+    }
+    .section-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #475569;
+      margin: 20px 0 12px 0;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .section-title:first-child {
+      margin-top: 0;
+    }
+    label {
+      display: block;
+      margin-top: 16px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    label span.hint {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    input, select {
+      box-sizing: border-box;
+      display: block;
+      width: 100%;
+      padding: 12px 14px;
+      margin-top: 6px;
+      font-size: 0.95rem;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+    }
+    button[type="submit"] {
+      margin-top: 28px;
+      padding: 14px;
+      width: 100%;
+      background: #0f172a;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="tag">Hackathon Demo</span>
+      <h1>Scholarship Application Portal</h1>
+      <p class="desc">A standard official application containing bureaucratic questions that require parental or guardian inputs.</p>
+      <div class="notice">
+        💡 <strong>How to test FormRelay:</strong> Activate the extension, click <strong>Select fields</strong>, select the guardian questions below, and click <strong>Create remote request</strong>. Watch how FormRelay's AI simplifies the questions on the recipient's phone!
+      </div>
+    </div>
+
+    <div class="form-box">
+      <form onsubmit="event.preventDefault(); alert('Demo submitted! No personal data was transferred.');">
+        <div class="section-title">Applicant Information</div>
+        <label>
+          Student Full Legal Name
+          <input id="student_name" type="text" value="Alex M. Rivera">
+        </label>
+
+        <div class="section-title">Guardian & Family Attestation (Confusing / Bureaucratic Questions)</div>
+        <label>
+          Guardian Legal Surname & Given Designation
+          <span class="hint">Official name as recorded in registry documents</span>
+          <input id="guardian_name" type="text">
+        </label>
+
+        <label>
+          Primary Kinship / Custodial Affiliation
+          <select id="guardian_relation">
+            <option value="">-- Specify Affiliation --</option>
+            <option value="Mother">Mother</option>
+            <option value="Father">Father</option>
+            <option value="Legal Guardian">Legal Guardian</option>
+            <option value="Grandparent">Grandparent</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
+
+        <label>
+          Current Vocation / Professional Livelihood
+          <span class="hint">Nature of employment or primary economic engagement</span>
+          <input id="guardian_job" type="text">
+        </label>
+
+        <label>
+          Telephonic Contact Number with Area Prefix
+          <input id="guardian_phone" type="tel">
+        </label>
+
+        <label>
+          Gross Annual Aggregate Household Remuneration (INR)
+          <span class="hint">Official pre-tax fiscal compensation across all household earners</span>
+          <input id="family_income" type="number">
+        </label>
+
+        <button type="submit">Submit Completed Scholarship Application</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

@@ -2,6 +2,8 @@ const express=require('express');
 const crypto=require('crypto');
 const QRCode=require('qrcode');
 const path=require('path');
+const { enhanceFieldsWithAI } = require('./ai');
+
 const app=express();
 app.disable('x-powered-by');
 app.use(express.json({limit:'32kb'}));
@@ -22,7 +24,8 @@ app.post('/api/requests',(req,res)=>{
   if(new Set(fields.map(f=>f.key)).size!==fields.length)return res.status(400).json({error:'Duplicate field keys'});
   const id=crypto.randomBytes(16).toString('hex');
   const ownerToken=crypto.randomBytes(32).toString('hex');
-  requests.set(id,{fields,ownerHash:crypto.createHash('sha256').update(ownerToken).digest('hex'),expires:Date.now()+TTL,answers:null});
+  const enhancedFields=enhanceFieldsWithAI(fields);
+  requests.set(id,{fields:enhancedFields,ownerHash:crypto.createHash('sha256').update(ownerToken).digest('hex'),expires:Date.now()+TTL,answers:null});
   res.status(201).json({id,ownerToken,url:`${req.protocol}://${req.get('host')}/r/${id}`,expiresInMinutes:30});
 });
 function find(req,res){const r=requests.get(req.params.id);if(!r||Date.now()>r.expires){res.status(404).json({error:'Request expired or not found'});return null;}return r}

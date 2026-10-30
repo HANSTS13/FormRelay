@@ -1,1 +1,355 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FormRelay Request</title><style>body{font-family:system-ui;max-width:500px;margin:auto;padding:24px;background:#f4f6fb}main{background:white;border-radius:14px;padding:22px;box-shadow:0 5px 25px #ddd}label{display:block;margin:18px 0 6px}input,select{width:100%;padding:12px;border:1px solid #bbb;border-radius:6px;box-sizing:border-box;font-size:1rem;background:white}button{margin-top:22px;padding:13px;width:100%;background:#2458df;color:white;border:0;border-radius:8px;font-size:1rem;cursor:pointer}#status{margin-top:16px}</style></head><body><main><h2>Complete requested fields</h2><p>Only answer if you trust the person who shared this link. Do not enter passwords, OTPs, or payment details.</p><form id="response"></form><div id="status"></div></main><script src="/recipient.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FormRelay — Remote Field Assistance</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --ai-badge-bg: #eff6ff;
+      --ai-badge-border: #bfdbfe;
+      --ai-badge-text: #1d4ed8;
+      --orig-bg: #f1f5f9;
+      --orig-text: #475569;
+      --tip-bg: #f0fdf4;
+      --tip-border: #bbf7d0;
+      --tip-text: #166534;
+      --success: #059669;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      padding: 32px 16px;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .header-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px -2px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+    }
+    .brand-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .brand-tag {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--primary);
+      background: #eff6ff;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+    .secure-badge {
+      font-size: 0.75rem;
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 600;
+    }
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .progress-container {
+      margin-top: 18px;
+    }
+    .progress-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .progress-bar-bg {
+      background: #e2e8f0;
+      height: 6px;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .progress-bar-fill {
+      background: linear-gradient(90deg, #3b82f6, #10b981);
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    .action-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid #f1f5f9;
+      flex-wrap: wrap;
+    }
+    .btn-secondary {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s;
+    }
+    .btn-secondary:hover {
+      background: #e2e8f0;
+    }
+    .btn-demo-autofill {
+      background: #f0fdf4;
+      border: 1px solid #86efac;
+      color: #166534;
+    }
+    .btn-demo-autofill:hover {
+      background: #dcfce7;
+    }
+    .form-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px -2px rgba(0,0,0,0.05);
+    }
+    .field-block {
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .field-block:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+    .field-label-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .question-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+    .ai-tag {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--ai-badge-text);
+      background: var(--ai-badge-bg);
+      border: 1px solid var(--ai-badge-border);
+      padding: 2px 8px;
+      border-radius: 12px;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .orig-subtext {
+      font-size: 0.82rem;
+      color: var(--orig-text);
+      background: var(--orig-bg);
+      padding: 4px 8px;
+      border-radius: 6px;
+      margin: 6px 0 8px 0;
+      display: inline-block;
+      max-width: 100%;
+      word-break: break-word;
+    }
+    .ai-hint-box {
+      font-size: 0.82rem;
+      color: var(--tip-text);
+      background: var(--tip-bg);
+      border: 1px solid var(--tip-border);
+      padding: 8px 12px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    input, select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      color: var(--text-main);
+      background: #ffffff;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+    }
+    .mic-btn {
+      position: absolute;
+      right: 8px;
+      background: transparent;
+      border: none;
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 8px;
+      color: #64748b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .mic-btn:hover {
+      background: #f1f5f9;
+      color: var(--primary);
+    }
+    .mic-btn.listening {
+      color: #ef4444;
+      animation: pulse 1s infinite;
+      background: #fee2e2;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+    .validation-pill {
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-top: 6px;
+      display: none;
+      align-items: center;
+      gap: 4px;
+    }
+    .validation-pill.valid {
+      color: var(--success);
+      display: flex;
+    }
+    .confirm-row {
+      margin-top: 22px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      background: #f8fafc;
+      padding: 12px;
+      border-radius: 8px;
+    }
+    .confirm-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    .submit-btn {
+      margin-top: 18px;
+      width: 100%;
+      padding: 14px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .submit-btn:hover {
+      background: var(--primary-hover);
+    }
+    .submit-btn:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+    #status {
+      margin-top: 16px;
+      font-size: 0.9rem;
+      text-align: center;
+    }
+    .status-success {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+      padding: 20px;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+    .status-error {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      padding: 14px;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-card">
+      <div class="brand-bar">
+        <span class="brand-tag">FormRelay AI Assistant</span>
+        <span class="secure-badge">🔒 Encrypted Direct Session</span>
+      </div>
+      <h1>Requested Form Assistance</h1>
+      <p class="subtitle">Complete the fields below to securely relay your answers directly to the applicant's official form in real time.</p>
+      
+      <div class="progress-container">
+        <div class="progress-meta">
+          <span id="progress-text">0 of 0 fields completed</span>
+          <span id="progress-percent">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div id="progress-bar" class="progress-bar-fill"></div>
+        </div>
+      </div>
+
+      <div class="action-bar">
+        <button id="toggle-view" class="btn-secondary" type="button">🔄 Show Original Legal Labels</button>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <form id="response"></form>
+      <div id="status"></div>
+    </div>
+  </div>
+
+  <script src="/recipient.js"></script>
+</body>
+</html>
