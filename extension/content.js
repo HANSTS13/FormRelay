@@ -3,12 +3,23 @@ if(window.__formrelayLoaded)return;
 window.__formrelayLoaded=true;
 let selecting=false;let chosen=[];let tracker=null;let timer=null;let previous=new Map();
 const allowed=new Set(['text','tel','email','number','date']);
+
+function getLabelText(el, fallback){
+  if(el.labels && el.labels.length > 0){
+    const clone = el.labels[0].cloneNode(true);
+    clone.querySelectorAll('input, select, textarea, button, .hint').forEach(n => n.remove());
+    const text = clone.textContent.trim().replace(/\s+/g, ' ');
+    if(text) return text;
+  }
+  return el.getAttribute('aria-label') || el.placeholder || el.name || el.id || fallback;
+}
+
 function fieldOf(el){
   if(el instanceof HTMLSelectElement){
     if(el.disabled||el.closest('[contenteditable="true"]'))return null;
     const name=el.getAttribute('name')||'';
     const id=el.id||'';
-    const label=el.labels?.[0]?.textContent?.trim()||el.getAttribute('aria-label')||name||id||'Unlabeled dropdown';
+    const label=getLabelText(el, name||id||'Unlabeled dropdown');
     if(/password|otp|one.time|verification|cvv|cvc|card|credit|debit|pin|aadhaar|aadhar|ssn/i.test([label,name,id].join(' ')))return null;
     const options=[...el.options].filter(o=>!o.disabled&&o.value.trim()).map(o=>({value:o.value,label:(o.text||o.value).trim()}));
     return {el,label:label.slice(0,100),type:'select',options};
@@ -17,7 +28,7 @@ function fieldOf(el){
   if(!allowed.has(el.type)||el.disabled||el.readOnly||el.closest('[contenteditable="true"]'))return null;
   const name=el.getAttribute('name')||'';
   const id=el.id||'';
-  const label=el.labels?.[0]?.textContent?.trim()||el.getAttribute('aria-label')||el.placeholder||name||id||'Unlabeled field';
+  const label=getLabelText(el, el.placeholder||name||id||'Unlabeled field');
   if(/password|otp|one.time|verification|cvv|cvc|card|credit|debit|pin|aadhaar|aadhar|ssn/i.test([label,name,id].join(' ')))return null;
   return {el,label:label.slice(0,100),type:el.type};
 }
