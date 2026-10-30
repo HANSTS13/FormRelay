@@ -1,66 +1,222 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>FormRelay</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font: 13px system-ui, sans-serif; width: 400px; padding: 14px; color: #1e293b; }
-    h2 { font-size: 1.1rem; margin-bottom: 3px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; width: 380px; padding: 14px; color: #1e293b; background: #ffffff; }
+    h2 { font-size: 1.15rem; font-weight: 700; color: #0f172a; margin-bottom: 2px; }
     .sub { font-size: 0.72rem; color: #64748b; margin-bottom: 12px; display: block; }
-    label { font-size: 0.78rem; font-weight: 600; color: #475569; }
-    input[type="text"] { width: 100%; padding: 7px 10px; margin: 4px 0 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.83rem; }
-    button { padding: 8px 12px; border: none; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
-    .btn-ai { width: 100%; padding: 11px; background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; border-radius: 8px; margin-bottom: 10px; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    label { font-size: 0.75rem; font-weight: 600; color: #475569; display: block; margin-bottom: 3px; }
+    input[type="text"] { width: 100%; padding: 7px 10px; margin-bottom: 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.82rem; }
+    
+    button { padding: 9px 12px; border: none; border-radius: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Primary AI Button */
+    .btn-ai-primary {
+      width: 100%;
+      padding: 12px;
+      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+      color: #ffffff;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+    }
+    .btn-ai-primary:hover {
+      background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+    }
+
+    /* AI Container Panel */
+    #ai-panel {
+      display: none;
+      background: #f8fafc;
+      border: 1.5px solid #c7d2fe;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .ai-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .ai-title {
+      font-weight: 700;
+      color: #3730a3;
+      font-size: 0.85rem;
+    }
+    .ai-close {
+      background: #e2e8f0;
+      border: none;
+      color: #475569;
+      padding: 3px 8px;
+      font-size: 0.72rem;
+      border-radius: 4px;
+    }
+    .ai-close:hover { background: #cbd5e1; }
+
+    /* Approval Step */
+    #ai-approval { display: none; }
+    .approval-box {
+      background: #ffffff;
+      border: 1px solid #e0e7ff;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 0.8rem;
+      color: #334155;
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+    .approval-box p {
+      margin-top: 5px;
+      font-size: 0.74rem;
+      color: #64748b;
+    }
+    .confirm-row { display: flex; gap: 8px; }
+    .btn-confirm { background: #4f46e5; color: #ffffff; flex: 1; }
+    .btn-confirm:hover { background: #4338ca; }
+    .btn-cancel { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; flex: 1; }
+    .btn-cancel:hover { background: #e2e8f0; }
+
+    /* Loading */
+    #ai-loading {
+      display: none;
+      text-align: center;
+      padding: 16px;
+      color: #4f46e5;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+
+    /* Group Results */
+    #ai-results { display: none; }
+    .group-card {
+      background: #ffffff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 8px;
+    }
+    .group-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+    .group-name {
+      font-weight: 700;
+      font-size: 0.88rem;
+      color: #1e1b4b;
+    }
+    .group-desc {
+      font-size: 0.74rem;
+      color: #64748b;
+      margin-bottom: 6px;
+      line-height: 1.3;
+    }
+    .group-fields-list {
+      padding-left: 8px;
+      margin-bottom: 8px;
+    }
+    .group-field-item {
+      font-size: 0.78rem;
+      color: #334155;
+      padding: 2px 0;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .field-type-tag {
+      font-size: 0.65rem;
+      background: #e0e7ff;
+      color: #3730a3;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .btn-create-group {
+      width: 100%;
+      background: #4f46e5;
+      color: #ffffff;
+      padding: 7px;
+      border-radius: 6px;
+      font-size: 0.78rem;
+    }
+    .btn-create-group:hover { background: #4338ca; }
+    .qr-mini {
+      width: 110px;
+      margin: 8px auto 4px auto;
+      display: block;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 4px;
+    }
+    .group-link {
+      font-size: 0.72rem;
+      word-break: break-all;
+      color: #2563eb;
+      display: block;
+      text-align: center;
+      margin-top: 3px;
+    }
+    .group-status {
+      font-size: 0.75rem;
+      color: #059669;
+      font-weight: 600;
+      margin-top: 4px;
+      text-align: center;
+    }
+    .ai-actions { margin-top: 8px; }
+    .btn-skip-ai {
+      width: 100%;
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+      font-size: 0.75rem;
+      padding: 7px;
+    }
+    .btn-skip-ai:hover { background: #e2e8f0; }
+
+    /* Manual Controls */
+    .manual-divider {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 10px 0 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .manual-divider::before, .manual-divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
     .btn-row { display: flex; gap: 6px; margin-bottom: 8px; }
     .btn-row button { flex: 1; background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
     .btn-row button:hover:not(:disabled) { background: #e2e8f0; }
     #create { width: 100%; padding: 10px; background: #2563eb; color: white; margin-top: 4px; }
     #create:hover { background: #1d4ed8; }
-    #fields { white-space: pre-wrap; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 6px; padding: 8px; margin: 8px 0; max-height: 100px; overflow-y: auto; font-size: 0.8rem; color: #334155; }
-    #message { margin: 6px 0; font-size: 0.8rem; color: #0284c7; word-break: break-word; }
+    #fields { white-space: pre-wrap; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 6px; padding: 8px; margin: 8px 0; max-height: 90px; overflow-y: auto; font-size: 0.78rem; color: #334155; }
+    #message { margin: 8px 0; font-size: 0.8rem; color: #0284c7; word-break: break-word; line-height: 1.3; }
     .qr-wrap { text-align: center; margin: 8px 0; }
-    #qr { width: 140px; display: none; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; }
-    #link { word-break: break-all; font-size: 0.78rem; color: #2563eb; display: inline-block; margin-top: 4px; }
-    #undo { width: 100%; margin-top: 8px; background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; }
-
-    /* ── AI Group Panel ─────────────────────────────── */
-    #ai-panel { display: none; background: #f5f3ff; border: 1px solid #c4b5fd; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
-    .ai-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .ai-title { font-weight: 700; color: #4c1d95; font-size: 0.88rem; }
-    .ai-close { background: white; border: 1px solid #ddd6fe; color: #6d28d9; padding: 3px 8px; font-size: 0.75rem; border-radius: 5px; }
-
-    /* Approval Step */
-    #ai-approval { display: none; }
-    .approval-box { background: white; border: 1px solid #ddd6fe; border-radius: 8px; padding: 10px; font-size: 0.82rem; color: #334155; margin-bottom: 8px; }
-    .approval-box p { margin-top: 6px; font-size: 0.75rem; color: #64748b; }
-    .confirm-row { display: flex; gap: 6px; }
-    .btn-confirm { background: #4f46e5; color: white; flex: 1; }
-    .btn-cancel { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; flex: 1; }
-
-    /* Loading */
-    #ai-loading { display: none; text-align: center; padding: 14px; color: #4f46e5; font-weight: 600; font-size: 0.85rem; }
-
-    /* Group Results */
-    #ai-results { display: none; }
-    .group-card { background: white; border: 1.5px solid #ddd6fe; border-radius: 8px; padding: 10px; margin-bottom: 8px; }
-    .group-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-    .group-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: #4f46e5; }
-    .group-name { font-weight: 700; font-size: 0.9rem; color: #3730a3; }
-    .group-desc { font-size: 0.74rem; color: #64748b; margin-bottom: 6px; }
-    .group-fields-list { padding-left: 12px; }
-    .group-field-item { font-size: 0.8rem; color: #1e293b; padding: 2px 0; display: flex; align-items: center; gap: 4px; }
-    .field-type-tag { font-size: 0.67rem; background: #e0e7ff; color: #3730a3; padding: 1px 5px; border-radius: 8px; }
-    .qr-mini { width: 80px; margin-top: 6px; display: none; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px; }
-    .group-link { font-size: 0.72rem; word-break: break-all; color: #2563eb; display: block; margin-top: 3px; }
-    .btn-create-group { margin-top: 6px; width: 100%; background: #4f46e5; color: white; padding: 7px; border-radius: 6px; font-size: 0.8rem; }
-    .btn-create-group:hover { background: #4338ca; }
-    .group-status { font-size: 0.78rem; color: #059669; margin-top: 4px; }
-    .ai-actions { display: flex; gap: 6px; margin-top: 8px; }
-    .ai-actions button { flex: 1; font-size: 0.78rem; }
-    .btn-use-selected { background: #059669; color: white; }
-    .btn-skip-ai { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+    #qr { width: 140px; display: none; border: 1px solid #e2e8f0; border-radius: 6px; padding: 4px; margin: 0 auto; }
+    #link { word-break: break-all; font-size: 0.75rem; color: #2563eb; display: inline-block; margin-top: 4px; }
+    #undo { width: 100%; margin-top: 8px; background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; font-size: 0.76rem; padding: 7px; }
+    #undo:hover { background: #f1f5f9; }
   </style>
 </head>
 <body>
@@ -70,23 +226,23 @@
   <label for="base">Backend URL</label>
   <input id="base" type="text" value="http://localhost:3000">
 
-  <!-- ✨ AI Smart Group Button -->
-  <button id="btn-ai-group" class="btn-ai" type="button">
-    ✨ AI Smart Group Fields
+  <!-- AI Smart Group Button -->
+  <button id="btn-ai-group" class="btn-ai-primary" type="button">
+    &#x2728; AI Smart Group Fields
   </button>
 
-  <!-- AI Panel -->
+  <!-- AI Interactive Panel -->
   <div id="ai-panel">
     <div class="ai-panel-header">
-      <span class="ai-title">🤖 AI Field Grouping</span>
-      <button class="ai-close" id="ai-close" type="button">✕ Close</button>
+      <span class="ai-title">&#x1F916; AI Field Grouping</span>
+      <button class="ai-close" id="ai-close" type="button">&#x2715; Close</button>
     </div>
 
-    <!-- Step 1: Approval -->
+    <!-- Step 1: Confirmation / Approval -->
     <div id="ai-approval">
       <div class="approval-box">
         <strong id="ai-scan-summary">Found form fields on this page.</strong>
-        <p>The AI will group them by WHO should fill them in, and generate separate QR links for each group. Only question titles are sent — no passwords or entered values.</p>
+        <p>AI will group these questions by who needs to fill them out (e.g. Applicant vs. Parent/Guardian) and generate separate delegate links. Only field labels are processed.</p>
       </div>
       <div class="confirm-row">
         <button id="ai-confirm" class="btn-confirm" type="button">Group with AI</button>
@@ -94,23 +250,24 @@
       </div>
     </div>
 
-    <!-- Step 2: Loading -->
+    <!-- Step 2: Loading State -->
     <div id="ai-loading">
-      ✨ AI is analyzing and grouping fields...<br>
-      <small style="color:#7c3aed">Using Gemini to find natural field groups</small>
+      &#x2728; Analyzing form structure with Gemini...<br>
+      <small style="color:#6366f1;font-weight:normal;">Finding logical delegation groups</small>
     </div>
 
-    <!-- Step 3: Results -->
+    <!-- Step 3: Group Results -->
     <div id="ai-results">
-      <p style="font-size:0.78rem;color:#475569;margin-bottom:8px;">AI grouped your form fields. Create a separate QR for each group:</p>
+      <p style="font-size:0.75rem;color:#475569;margin-bottom:8px;">AI grouped your form. Click to generate QR for each person:</p>
       <div id="group-cards-container"></div>
       <div class="ai-actions">
-        <button id="btn-skip-ai" class="btn-skip-ai" type="button">Ignore AI — Manual select</button>
+        <button id="btn-skip-ai" class="btn-skip-ai" type="button">Ignore AI &mdash; Switch to Manual</button>
       </div>
     </div>
   </div>
 
-  <!-- Manual Controls -->
+  <!-- Manual Mode Section -->
+  <div class="manual-divider">Or Manual Selection</div>
   <div class="btn-row">
     <button id="select" type="button">1. Manual Select</button>
     <button id="finish" type="button">2. Finish</button>
