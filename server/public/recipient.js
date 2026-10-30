@@ -1,4 +1,64 @@
 const id=location.pathname.split('/').pop();const form=document.getElementById('response');const status=document.getElementById('status');let fields=[];
-async function load(){try{const r=await fetch(`/api/requests/${id}/fields`);const data=await r.json();if(!r.ok)throw Error(data.error||'Unavailable');if(data.submitted){status.textContent='This request is already completed.';return;}fields=data.fields;for(const f of fields){const label=document.createElement('label');label.textContent=f.label;const input=document.createElement('input');input.name=f.key;input.type=f.type;input.required=true;input.maxLength=500;label.appendChild(input);form.appendChild(label)}const button=document.createElement('button');button.type='submit';button.textContent='Send answers';form.appendChild(button)}catch(e){status.textContent=e.message}}
-form.addEventListener('submit',async(e)=>{e.preventDefault();const answers={};for(const f of fields)answers[f.key]=form.elements.namedItem(f.key).value;const button=form.querySelector('button');button.disabled=true;try{const r=await fetch(`/api/requests/${id}/answer`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers})});const d=await r.json();if(!r.ok)throw Error(d.error||'Failed');form.remove();status.textContent='Submitted! The requester’s original form can now fill automatically.'}catch(e){status.textContent=e.message;button.disabled=false}});
+async function load(){
+  try{
+    const r=await fetch(`/api/requests/${id}/fields`);
+    const data=await r.json();
+    if(!r.ok)throw Error(data.error||'Unavailable');
+    if(data.submitted){status.textContent='This request is already completed.';return;}
+    fields=data.fields;
+    for(const f of fields){
+      const label=document.createElement('label');
+      label.textContent=f.label;
+      if(f.type==='select'){
+        const select=document.createElement('select');
+        select.name=f.key;
+        select.required=true;
+        const defaultOpt=document.createElement('option');
+        defaultOpt.value='';
+        defaultOpt.textContent=`-- Select ${f.label} --`;
+        select.appendChild(defaultOpt);
+        if(Array.isArray(f.options)){
+          for(const opt of f.options){
+            const optionEl=document.createElement('option');
+            optionEl.value=opt.value;
+            optionEl.textContent=opt.label||opt.value;
+            select.appendChild(optionEl);
+          }
+        }
+        label.appendChild(select);
+      }else{
+        const input=document.createElement('input');
+        input.name=f.key;
+        input.type=f.type;
+        input.required=true;
+        input.maxLength=500;
+        label.appendChild(input);
+      }
+      form.appendChild(label);
+    }
+    const button=document.createElement('button');
+    button.type='submit';
+    button.textContent='Send answers';
+    form.appendChild(button);
+  }catch(e){
+    status.textContent=e.message;
+  }
+}
+form.addEventListener('submit',async(e)=>{
+  e.preventDefault();
+  const answers={};
+  for(const f of fields)answers[f.key]=form.elements.namedItem(f.key).value;
+  const button=form.querySelector('button');
+  button.disabled=true;
+  try{
+    const r=await fetch(`/api/requests/${id}/answer`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers})});
+    const d=await r.json();
+    if(!r.ok)throw Error(d.error||'Failed');
+    form.remove();
+    status.textContent='Submitted! The requester’s original form can now fill automatically.';
+  }catch(e){
+    status.textContent=e.message;
+    button.disabled=false;
+  }
+});
 load();
