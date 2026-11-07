@@ -4,6 +4,30 @@
  * Creates one separate relay request per group.
  */
 
+const fs = require('fs');
+const path = require('path');
+
+// Auto-load .env from current directory or parent directory if not loaded
+if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY) {
+  const envCandidates = [
+    path.join(__dirname, '.env'),
+    path.join(__dirname, '..', '.env'),
+    path.join(__dirname, '..', 'server', '.env')
+  ];
+  for (const p of envCandidates) {
+    if (fs.existsSync(p)) {
+      for (const line of fs.readFileSync(p, 'utf8').split('\n')) {
+        const m = line.match(/^\s*([\w.-]+)\s*=\s*(.*)?\s*$/);
+        if (m) {
+          const v = (m[2] || '').trim().replace(/^["']|["']$/g, '');
+          if (!process.env[m[1]]) process.env[m[1]] = v;
+        }
+      }
+      break;
+    }
+  }
+}
+
 const VALID_CATEGORIES = ['Applicant','Parent / Guardian','Institution','Employer','Other','Uncertain'];
 
 /**
@@ -63,7 +87,7 @@ async function groupFieldsByPerson(fields) {
     }
   }
 
-  if (hasMemberPattern && groupsMap.size >= 2) {
+  if (hasMemberPattern && groupsMap.size >= 1) {
     const groups = [];
     for (const [groupName, groupFields] of groupsMap) {
       groups.push({
@@ -76,7 +100,7 @@ async function groupFieldsByPerson(fields) {
     const remaining = sanitized.filter(f => !usedKeys.has(f.key));
     if (remaining.length > 0) {
       groups.push({
-        groupName: 'General Details',
+        groupName: 'Team / General Details',
         description: 'Remaining form questions',
         fields: remaining
       });
@@ -121,7 +145,7 @@ ${JSON.stringify(sanitized, null, 2)}`;
     }
   };
 
-  const models = ['gemini-3.8-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+  const models = ['gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.8-flash'];
   let lastError = null;
 
   for (const modelName of models) {

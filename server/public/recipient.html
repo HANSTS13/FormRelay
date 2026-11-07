@@ -4,147 +4,194 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>FormRelay — Remote Field Assistance</title>
+  <link rel="icon" type="image/png" href="/icons/icon32.png">
   <style>
     :root {
-      --primary: #2563eb;
-      --primary-hover: #1d4ed8;
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --primary-light: #eef2ff;
+      --primary-glow: rgba(79, 70, 229, 0.25);
+      
+      --secondary: #0d9488;
+      --secondary-light: #f0fdfa;
+      
       --bg: #f8fafc;
       --card-bg: #ffffff;
+      
       --text-main: #0f172a;
+      --text-body: #334155;
       --text-muted: #64748b;
       --border: #e2e8f0;
-      --ai-badge-bg: #eff6ff;
-      --ai-badge-border: #bfdbfe;
-      --ai-badge-text: #1d4ed8;
-      --orig-bg: #f1f5f9;
-      --orig-text: #475569;
-      --tip-bg: #f0fdf4;
-      --tip-border: #bbf7d0;
-      --tip-text: #166534;
-      --success: #059669;
+      
+      --success: #10b981;
+      --success-bg: #ecfdf5;
+      --danger: #ef4444;
+      --danger-bg: #fef2f2;
+      
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --radius-pill: 9999px;
+      
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+      --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.08);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", Helvetica, Arial, sans-serif;
       background: var(--bg);
-      color: var(--text-main);
-      padding: 32px 16px;
+      color: var(--text-body);
+      padding: 32px 16px 60px;
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
     .container {
-      max-width: 600px;
+      max-width: 620px;
       margin: 0 auto;
     }
+    
+    /* Top Header Card */
     .header-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 4px 20px -2px rgba(0,0,0,0.05);
+      border-radius: var(--radius-lg);
+      padding: 24px 28px;
+      box-shadow: var(--shadow-md);
       margin-bottom: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .header-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, #4f46e5, #06b6d4, #10b981);
     }
     .brand-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 12px;
+      margin-bottom: 16px;
     }
-    .brand-tag {
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: var(--primary);
-      background: #eff6ff;
-      padding: 4px 10px;
-      border-radius: 20px;
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
-    .secure-badge {
-      font-size: 0.75rem;
-      color: var(--success);
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, #4f46e5, #06b6d4);
       display: flex;
       align-items: center;
-      gap: 4px;
-      font-weight: 600;
+      justify-content: center;
+      box-shadow: 0 2px 6px var(--primary-glow);
     }
-    h1 {
-      font-size: 1.4rem;
+    .brand-icon svg {
+      width: 16px;
+      height: 16px;
+    }
+    .brand-name {
+      font-size: 14px;
       font-weight: 700;
       color: var(--text-main);
+    }
+    .secure-badge {
+      font-size: 11px;
+      color: var(--secondary);
+      background: var(--secondary-light);
+      border: 1px solid #ccfbf1;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    h1 {
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--text-main);
+      letter-spacing: -0.4px;
       margin-bottom: 6px;
     }
     .subtitle {
       font-size: 0.9rem;
       color: var(--text-muted);
+      line-height: 1.5;
     }
+    
+    /* Progress Bar */
     .progress-container {
-      margin-top: 18px;
+      margin-top: 20px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
     }
     .progress-meta {
       display: flex;
       justify-content: space-between;
-      font-size: 0.78rem;
+      font-size: 12px;
       font-weight: 600;
       color: var(--text-muted);
-      margin-bottom: 6px;
+      margin-bottom: 8px;
     }
     .progress-bar-bg {
       background: #e2e8f0;
-      height: 6px;
-      border-radius: 10px;
+      height: 8px;
+      border-radius: var(--radius-pill);
       overflow: hidden;
     }
     .progress-bar-fill {
-      background: linear-gradient(90deg, #3b82f6, #10b981);
+      background: linear-gradient(90deg, #4f46e5, #06b6d4, #10b981);
       height: 100%;
       width: 0%;
-      transition: width 0.3s ease;
+      transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     }
+    
+    /* Actions Bar */
     .action-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 10px;
-      margin-top: 16px;
-      padding-top: 14px;
-      border-top: 1px solid #f1f5f9;
-      flex-wrap: wrap;
+      margin-top: 14px;
     }
     .btn-secondary {
-      background: #f1f5f9;
-      border: 1px solid #cbd5e1;
-      padding: 7px 12px;
-      border-radius: 8px;
+      background: #ffffff;
+      border: 1.5px solid var(--border);
+      padding: 7px 13px;
+      border-radius: var(--radius-sm);
       font-size: 0.8rem;
       font-weight: 600;
-      color: #334155;
+      color: var(--text-body);
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 6px;
       transition: all 0.15s;
     }
     .btn-secondary:hover {
-      background: #e2e8f0;
+      background: #f1f5f9;
+      border-color: #cbd5e1;
     }
-    .btn-demo-autofill {
-      background: #f0fdf4;
-      border: 1px solid #86efac;
-      color: #166534;
-    }
-    .btn-demo-autofill:hover {
-      background: #dcfce7;
-    }
+    
+    /* Main Form Card */
     .form-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 24px;
-      box-shadow: 0 4px 20px -2px rgba(0,0,0,0.05);
+      border-radius: var(--radius-lg);
+      padding: 28px;
+      box-shadow: var(--shadow-md);
     }
     .field-block {
       margin-bottom: 24px;
-      padding-bottom: 20px;
+      padding-bottom: 22px;
       border-bottom: 1px solid #f1f5f9;
     }
     .field-block:last-child {
@@ -156,87 +203,90 @@
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 4px;
+      gap: 10px;
+      margin-bottom: 6px;
     }
     .question-title {
       font-size: 1rem;
-      font-weight: 600;
+      font-weight: 700;
       color: var(--text-main);
+      letter-spacing: -0.2px;
     }
     .ai-tag {
       font-size: 0.72rem;
-      font-weight: 600;
-      color: var(--ai-badge-text);
-      background: var(--ai-badge-bg);
-      border: 1px solid var(--ai-badge-border);
+      font-weight: 700;
+      color: var(--primary);
+      background: var(--primary-light);
+      border: 1px solid #c7d2fe;
       padding: 2px 8px;
-      border-radius: 12px;
+      border-radius: var(--radius-pill);
       white-space: nowrap;
       display: inline-flex;
       align-items: center;
-      gap: 3px;
+      gap: 4px;
     }
     .orig-subtext {
-      font-size: 0.82rem;
-      color: var(--orig-text);
-      background: var(--orig-bg);
-      padding: 4px 8px;
-      border-radius: 6px;
-      margin: 6px 0 8px 0;
-      display: inline-block;
-      max-width: 100%;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      padding: 5px 10px;
+      border-radius: var(--radius-sm);
+      margin: 6px 0 10px 0;
+      display: block;
       word-break: break-word;
     }
     .ai-hint-box {
       font-size: 0.82rem;
-      color: var(--tip-text);
-      background: var(--tip-bg);
-      border: 1px solid var(--tip-border);
-      padding: 8px 12px;
-      border-radius: 8px;
+      color: #065f46;
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      padding: 9px 12px;
+      border-radius: var(--radius-sm);
       margin-bottom: 10px;
       display: flex;
       align-items: flex-start;
-      gap: 6px;
+      gap: 8px;
+      line-height: 1.45;
     }
     .input-wrapper {
       position: relative;
       display: flex;
       align-items: center;
     }
-    input, select {
+    input, select, textarea {
       width: 100%;
       padding: 12px 14px;
       border: 1.5px solid #cbd5e1;
-      border-radius: 10px;
+      border-radius: var(--radius-md);
       font-size: 0.95rem;
       color: var(--text-main);
       background: #ffffff;
       outline: none;
-      transition: border-color 0.15s, box-shadow 0.15s;
+      transition: border-color 0.18s, box-shadow 0.18s;
+      font-family: inherit;
     }
-    input:focus, select:focus {
+    input:focus, select:focus, textarea:focus {
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+      box-shadow: 0 0 0 3px var(--primary-glow);
     }
     .mic-btn {
       position: absolute;
-      right: 8px;
+      right: 10px;
       background: transparent;
       border: none;
-      font-size: 1.1rem;
+      font-size: 1.15rem;
       cursor: pointer;
       padding: 6px;
-      border-radius: 8px;
-      color: #64748b;
+      border-radius: var(--radius-sm);
+      color: var(--text-muted);
       display: flex;
       align-items: center;
       justify-content: center;
       transition: all 0.15s;
     }
     .mic-btn:hover {
-      background: #f1f5f9;
+      background: var(--primary-light);
       color: var(--primary);
     }
     .mic-btn.listening {
@@ -255,67 +305,84 @@
       margin-top: 6px;
       display: none;
       align-items: center;
-      gap: 4px;
+      gap: 5px;
     }
     .validation-pill.valid {
       color: var(--success);
       display: flex;
     }
-    .confirm-row {
-      margin-top: 22px;
+    
+    /* Submit Button */
+    .submit-btn {
+      margin-top: 24px;
+      width: 100%;
+      padding: 14px 20px;
+      background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-md);
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 12px var(--primary-glow);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      background: #f8fafc;
-      padding: 12px;
-      border-radius: 8px;
+      justify-content: center;
+      gap: 8px;
     }
-    .confirm-row input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      cursor: pointer;
-    }
-    .submit-btn {
-      margin-top: 18px;
-      width: 100%;
-      padding: 14px;
-      background: var(--primary);
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .submit-btn:hover {
-      background: var(--primary-hover);
+    .submit-btn:hover:not(:disabled) {
+      background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
+      box-shadow: 0 6px 16px var(--primary-glow);
+      transform: translateY(-1px);
     }
     .submit-btn:disabled {
       background: #94a3b8;
+      box-shadow: none;
       cursor: not-allowed;
+      transform: none;
     }
+    
+    /* Status Messages */
     #status {
-      margin-top: 16px;
-      font-size: 0.9rem;
+      margin-top: 20px;
+      font-size: 0.95rem;
       text-align: center;
     }
     .status-success {
       background: #ecfdf5;
-      border: 1px solid #a7f3d0;
+      border: 1.5px solid #6ee7b7;
       color: #065f46;
-      padding: 20px;
-      border-radius: 12px;
+      padding: 24px;
+      border-radius: var(--radius-lg);
       font-weight: 500;
+      box-shadow: var(--shadow-sm);
+    }
+    .status-success h3 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: #047857;
     }
     .status-error {
       background: #fef2f2;
-      border: 1px solid #fecaca;
+      border: 1.5px solid #fca5a5;
       color: #991b1b;
-      padding: 14px;
-      border-radius: 10px;
+      padding: 16px;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+    }
+    
+    /* Footer Security */
+    .page-footer {
+      text-align: center;
+      margin-top: 28px;
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
   </style>
 </head>
@@ -323,15 +390,27 @@
   <div class="container">
     <div class="header-card">
       <div class="brand-bar">
-        <span class="brand-tag">FormRelay AI Assistant</span>
-        <span class="secure-badge">🔒 Encrypted Direct Session</span>
+        <div class="brand-badge">
+          <div class="brand-icon">
+            <svg viewBox="0 0 128 128" fill="none">
+              <rect x="24" y="24" width="56" height="80" rx="8" fill="#FFFFFF" opacity="0.95"/>
+              <rect x="34" y="38" width="28" height="5" rx="2.5" fill="#4F46E5"/>
+              <rect x="34" y="49" width="36" height="4.5" rx="2.25" fill="#94A3B8"/>
+              <path d="M 68 46 C 92 46, 102 62, 100 80 C 98 94, 82 102, 68 98" stroke="#10B981" stroke-width="7" stroke-linecap="round"/>
+              <polygon points="98,42 110,48 98,56 102,49" fill="#06B6D4"/>
+            </svg>
+          </div>
+          <span class="brand-name">FormRelay</span>
+        </div>
+        <span class="secure-badge">🔒 256-Bit Encrypted Session</span>
       </div>
+      
       <h1>Requested Form Assistance</h1>
-      <p class="subtitle">Complete the fields below to securely relay your answers directly to the applicant's official form in real time.</p>
+      <p class="subtitle">Complete the assigned fields below to securely relay your answers directly to the original form in real time.</p>
       
       <div class="progress-container">
         <div class="progress-meta">
-          <span id="progress-text">0 of 0 fields completed</span>
+          <span id="progress-text">0 of 0 questions completed</span>
           <span id="progress-percent">0%</span>
         </div>
         <div class="progress-bar-bg">
@@ -340,13 +419,17 @@
       </div>
 
       <div class="action-bar">
-        <button id="toggle-view" class="btn-secondary" type="button">🔄 Show Original Legal Labels</button>
+        <button id="toggle-view" class="btn-secondary" type="button">📋 Show Original Legal Labels</button>
       </div>
     </div>
 
     <div class="form-card">
       <form id="response"></form>
       <div id="status"></div>
+    </div>
+
+    <div class="page-footer">
+      <span>🛡️ Answers are transmitted over encrypted TLS • Self-destructs after completion</span>
     </div>
   </div>
 

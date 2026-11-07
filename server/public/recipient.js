@@ -9,23 +9,31 @@ const progressPercent = document.getElementById('progress-percent');
 let fields = [];
 let useSimplified = true;
 
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 async function load() {
   try {
     const r = await fetch(`/api/requests/${id}/fields`);
     const data = await r.json();
-    if (!r.ok) throw Error(data.error || 'Unavailable');
+    if (!r.ok) throw new Error(data.error || 'Unavailable or Expired Request');
     if (data.submitted) {
       status.className = 'status-success';
-      status.innerHTML = '<h3>✓ Request Completed</h3><p style="margin-top:8px">This request has already been answered and relayed back to the original form.</p>';
+      status.innerHTML = '<h3>✓ Request Already Completed</h3><p style="margin-top:8px">This request has already been answered and securely relayed back to the original form.</p>';
       form.style.display = 'none';
       return;
     }
-    fields = data.fields;
+    fields = data.fields || [];
     renderFields();
     updateProgress();
   } catch (e) {
     status.className = 'status-error';
-    status.textContent = e.message;
+    status.textContent = '❌ ' + e.message;
   }
 }
 
@@ -40,12 +48,11 @@ function updateProgress() {
   }
   const pct = Math.round((filled / fields.length) * 100);
   if (progressBar) progressBar.style.width = pct + '%';
-  if (progressText) progressText.textContent = `${filled} of ${fields.length} fields completed`;
+  if (progressText) progressText.textContent = `${filled} of ${fields.length} questions completed`;
   if (progressPercent) progressPercent.textContent = `${pct}%`;
 }
 
 function renderFields() {
-  // Preserve any currently typed values before re-rendering
   const currentValues = {};
   for (const f of fields) {
     const el = form.elements?.namedItem?.(f.key);
@@ -77,7 +84,7 @@ function renderFields() {
 
     block.appendChild(labelRow);
 
-    // Safeguard: Always show original official wording
+    // Always show original legal question as safeguard
     if (useSimplified && f.isSimplified && f.originalLabel) {
       const origText = document.createElement('div');
       origText.className = 'orig-subtext';
@@ -85,7 +92,7 @@ function renderFields() {
       block.appendChild(origText);
     }
 
-    // AI Contextual Guidance Tip (Specific & Actionable)
+    // AI Guidance tip
     if (f.aiHint) {
       const hint = document.createElement('div');
       hint.className = 'ai-hint-box';
@@ -96,6 +103,9 @@ function renderFields() {
     // Control Wrapper
     const wrapper = document.createElement('div');
     wrapper.className = 'input-wrapper';
+
+    const valPill = document.createElement('div');
+    valPill.className = 'validation-pill';
 
     if (f.type === 'select') {
       const select = document.createElement('select');
@@ -129,7 +139,6 @@ function renderFields() {
       textarea.required = true;
       textarea.rows = 3;
       textarea.maxLength = 500;
-      textarea.style.cssText = 'width: 100%; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 10px; font-family: inherit; font-size: 0.95rem;';
       textarea.placeholder = `Enter ${useSimplified ? (f.simplifiedLabel || f.label) : f.label}...`;
       if (currentValues[f.key]) textarea.value = currentValues[f.key];
       textarea.addEventListener('input', () => {
@@ -141,7 +150,7 @@ function renderFields() {
       const input = document.createElement('input');
       input.id = f.key;
       input.name = f.key;
-      input.type = f.type;
+      input.type = f.type || 'text';
       input.required = true;
       input.maxLength = 500;
       input.placeholder = `Enter ${useSimplified ? (f.simplifiedLabel || f.label) : f.label}...`;
@@ -154,12 +163,12 @@ function renderFields() {
 
       wrapper.appendChild(input);
 
-      // AI Voice Input (Speech-to-Text) Support
+      // AI Voice Input (Web Speech API)
       if (('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window)) {
         const mic = document.createElement('button');
         mic.type = 'button';
         mic.className = 'mic-btn';
-        mic.title = 'Speak answer (AI Voice Assistant)';
+        mic.title = 'Speak answer (Speech-to-Text)';
         mic.innerHTML = '🎙️';
         mic.onclick = () => startVoiceInput(mic, input);
         wrapper.appendChild(mic);
@@ -167,14 +176,9 @@ function renderFields() {
     }
 
     block.appendChild(wrapper);
-
-    // Live AI Validation Pill
-    const valPill = document.createElement('div');
-    valPill.className = 'validation-pill';
     block.appendChild(valPill);
 
-    // Run initial validation if prefilled
-    const initialEl = wrapper.querySelector('input, select');
+    const initialEl = wrapper.querySelector('input, select, textarea');
     if (initialEl && initialEl.value) {
       validateField(f, initialEl, valPill);
     }
@@ -182,12 +186,12 @@ function renderFields() {
     form.appendChild(block);
   }
 
-  // Legal & Accuracy confirmation
+  // Legal & Accuracy confirmation checkbox
   const confirmBlock = document.createElement('div');
-  confirmBlock.className = 'confirm-row';
+  confirmBlock.style.cssText = 'margin-top: 22px; display: flex; align-items: center; gap: 10px; font-size: 0.85rem; color: #475569; background: #f8fafc; border: 1px solid #e2e8f0; padding: 12px 14px; border-radius: 10px;';
   confirmBlock.innerHTML = `
-    <input type="checkbox" id="user-confirm" required checked>
-    <label for="user-confirm">I verify that the above information is accurate for the student's official application.</label>
+    <input type="checkbox" id="user-confirm" required checked style="width: 18px; height: 18px; cursor: pointer; accent-color: #4f46e5;">
+    <label for="user-confirm" style="cursor: pointer;">I confirm that these details are authentic and authorized for official form submission.</label>
   `;
   form.appendChild(confirmBlock);
 
@@ -195,7 +199,7 @@ function renderFields() {
   const submitBtn = document.createElement('button');
   submitBtn.type = 'submit';
   submitBtn.className = 'submit-btn';
-  submitBtn.textContent = 'Submit Answers Securely';
+  submitBtn.innerHTML = '🔒 Submit Answers Securely';
   form.appendChild(submitBtn);
 }
 
@@ -207,31 +211,39 @@ function validateField(f, el, pill) {
     return;
   }
 
-  const key = f.key.toLowerCase();
+  const key = (f.key || '').toLowerCase();
   const label = (f.label || '').toLowerCase();
 
-  if (f.type === 'tel' || key.includes('phone') || label.includes('phone') || label.includes('telephonic')) {
+  if (f.type === 'tel' || key.includes('phone') || label.includes('phone') || label.includes('contact') || label.includes('mobile')) {
     const cleanDigits = val.replace(/\D/g, '');
     if (cleanDigits.length >= 10) {
       pill.className = 'validation-pill valid';
-      pill.innerHTML = `✓ Valid phone number format (${cleanDigits.length} digits)`;
+      pill.innerHTML = `✓ Valid phone format (${cleanDigits.length} digits)`;
       return;
     }
   }
 
-  if (f.type === 'number' || key.includes('income') || label.includes('remuneration') || label.includes('income')) {
+  if (f.type === 'email' || key.includes('email') || label.includes('email')) {
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+      pill.className = 'validation-pill valid';
+      pill.innerHTML = `✓ Valid email address`;
+      return;
+    }
+  }
+
+  if (f.type === 'number' || key.includes('income') || label.includes('remuneration') || label.includes('salary') || label.includes('income')) {
     const num = parseFloat(val);
     if (!isNaN(num) && num > 0) {
       pill.className = 'validation-pill valid';
-      pill.innerHTML = `✓ Valid annual income: ₹${num.toLocaleString('en-IN')}`;
+      pill.innerHTML = `✓ Valid income amount: ₹${num.toLocaleString('en-IN')}`;
       return;
     }
   }
 
-  if (key.includes('name') || label.includes('name') || label.includes('surname')) {
-    if (val.includes(' ') && val.length >= 4) {
+  if (key.includes('name') || label.includes('name') || label.includes('member')) {
+    if (val.length >= 3) {
       pill.className = 'validation-pill valid';
-      pill.innerHTML = `✓ Full legal name recognized`;
+      pill.innerHTML = `✓ Name format valid`;
       return;
     }
   }
@@ -251,7 +263,7 @@ function startVoiceInput(micBtn, targetInput) {
   if (!SpeechRecognition) return;
 
   const recognition = new SpeechRecognition();
-  recognition.lang = 'en-IN';
+  recognition.lang = 'en-US';
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
 
@@ -279,24 +291,26 @@ function startVoiceInput(micBtn, targetInput) {
   recognition.start();
 }
 
-// Toggle View Button
 if (toggleBtn) {
   toggleBtn.addEventListener('click', () => {
     useSimplified = !useSimplified;
-    toggleBtn.textContent = useSimplified ? '🔄 Show Original Legal Labels' : '✨ Show AI Simplified Labels';
+    toggleBtn.textContent = useSimplified ? '📋 Show Original Legal Labels' : '✨ Show AI Simplified Labels';
     renderFields();
   });
 }
 
-// Form Submission
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   const answers = {};
   for (const f of fields) {
-    answers[f.key] = form.elements.namedItem(f.key).value;
+    const el = form.elements.namedItem(f.key);
+    answers[f.key] = el ? el.value : '';
   }
   const button = form.querySelector('button[type="submit"]');
-  if (button) button.disabled = true;
+  if (button) {
+    button.disabled = true;
+    button.textContent = '⏳ Encrypting & Transmitting...';
+  }
 
   try {
     const r = await fetch(`/api/requests/${id}/answer`, {
@@ -305,32 +319,28 @@ form.addEventListener('submit', async (e) => {
       body: JSON.stringify({ answers })
     });
     const d = await r.json();
-    if (!r.ok) throw Error(d.error || 'Failed to submit answers');
+    if (!r.ok) throw new Error(d.error || 'Failed to submit answers');
 
     form.remove();
     if (toggleBtn) toggleBtn.style.display = 'none';
     if (progressBar) progressBar.style.width = '100%';
-    if (progressText) progressText.textContent = 'All fields submitted!';
+    if (progressText) progressText.textContent = 'All questions submitted!';
     if (progressPercent) progressPercent.textContent = '100%';
 
     status.className = 'status-success';
     status.innerHTML = `
-      <h3>✓ Successfully Submitted!</h3>
-      <p style="margin-top:6px; font-size: 0.95rem;">Your answers have been securely transferred. The student's original form will automatically populate in real time.</p>
+      <h3>🎉 Answers Transmitted Successfully!</h3>
+      <p style="margin-top:8px; font-size: 0.95rem; line-height: 1.5;">Your answers have been securely relayed back to the applicant's browser. The original form on their device will automatically populate in real time.</p>
+      <div style="margin-top: 14px; font-size: 11px; color: #047857;">🔒 This session has now self-destructed and is locked from further edits.</div>
     `;
   } catch (e) {
     status.className = 'status-error';
-    status.textContent = e.message;
-    if (button) button.disabled = false;
+    status.textContent = '❌ ' + e.message;
+    if (button) {
+      button.disabled = false;
+      button.textContent = '🔒 Submit Answers Securely';
+    }
   }
 });
-
-function escapeHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 load();

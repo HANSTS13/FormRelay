@@ -135,18 +135,47 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+async function copyText(text, btn, originalText) {
+  try {
+    await navigator.clipboard.writeText(text);
+    if (btn) {
+      btn.textContent = '✓ Copied!';
+      btn.style.color = '#10b981';
+      btn.style.borderColor = '#10b981';
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.color = '';
+        btn.style.borderColor = '';
+      }, 2000);
+    }
+    notify('Link copied to clipboard!');
+  } catch (e) {
+    notify('Press Ctrl+C to copy', 'error');
+  }
+}
+
+function downloadImage(url, filename) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'formrelay-qr.png';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  notify('QR Code downloaded!');
+}
+
 const aiBtn = $('btn-ai-group');
 if (aiBtn) {
   aiBtn.onclick = async () => {
     try {
-      notify('Scanning webpage fields for AI segregation...', 'loading');
+      notify('Scanning webpage questions for AI segregation...', 'loading');
       await ensure();
       const res = await content('SCAN_FIELDS');
       if (!res?.ok || !res.fields?.length) {
-        throw new Error('No supported form questions found on this page. Navigate to your form first.');
+        throw new Error('No supported questions found on this form. Open a Google Form or demo form first.');
       }
       scannedFields = res.fields;
-      $('ai-scan-summary').textContent = 'Found ' + scannedFields.length + ' questions on this form.';
+      $('ai-scan-summary').textContent = 'Detected ' + scannedFields.length + ' supported questions on this form.';
       $('ai-panel').style.display = 'block';
       $('ai-approval').style.display = 'block';
       $('ai-loading').style.display = 'none';
@@ -162,7 +191,7 @@ if ($('ai-close')) $('ai-close').onclick = () => { $('ai-panel').style.display =
 if ($('ai-cancel')) $('ai-cancel').onclick = () => { $('ai-panel').style.display = 'none'; };
 if ($('btn-skip-ai')) $('btn-skip-ai').onclick = () => {
   $('ai-panel').style.display = 'none';
-  notify('Manual selection enabled. Click "+ Start selection".');
+  notify('Switched to manual selection. Click "+ Start selection".');
 };
 
 if ($('ai-confirm')) {
@@ -190,17 +219,17 @@ if ($('ai-confirm')) {
       aiGroups = data.groups || [];
       if (!aiGroups.length) {
         $('ai-approval').style.display = 'block';
-        notify('AI found no separable groups.', 'error');
+        notify('No separable member groups found.', 'error');
         return;
       }
 
       renderAiGroupCards(aiGroups, origin);
       $('ai-results').style.display = 'block';
-      notify('AI segregated ' + aiGroups.length + ' group(s). Create QR/link for each member below.');
+      notify('AI segregated ' + aiGroups.length + ' group(s)! Individual QRs ready below.');
     } catch (err) {
       $('ai-loading').style.display = 'none';
       $('ai-approval').style.display = 'block';
-      notify('Network error: ' + err.message, 'error');
+      notify('Network error connecting to backend: ' + err.message, 'error');
     }
   };
 }
@@ -213,36 +242,37 @@ function renderAiGroupCards(groups, origin) {
   const allBtn = document.createElement('button');
   allBtn.type = 'button';
   allBtn.className = 'button primary wide';
-  allBtn.style.cssText = 'background: #0d6b61; margin-bottom: 12px; font-weight: 700; font-size: 11px; min-height: 34px;';
+  allBtn.style.cssText = 'background: #0d9488; margin-bottom: 12px; font-weight: 700; font-size: 12px; min-height: 36px; box-shadow: 0 2px 6px rgba(13,148,136,0.3);';
   allBtn.textContent = '⚡ Generate QRs for All Groups (' + groups.length + ')';
   allBtn.onclick = async () => {
     allBtn.disabled = true;
-    allBtn.textContent = 'Generating all QRs...';
+    allBtn.textContent = '⏳ Generating all QRs...';
     for (let i = 0; i < groups.length; i++) {
       await createQrForGroupCard(groups[i], i, origin);
     }
-    allBtn.textContent = '✓ All QRs Generated!';
+    allBtn.textContent = '✓ All ' + groups.length + ' QRs Generated!';
+    allBtn.style.background = '#059669';
   };
   container.appendChild(allBtn);
 
   groups.forEach((g, idx) => {
     const card = document.createElement('div');
-    card.style.cssText = 'background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);';
+    card.className = 'group-card';
 
     const header = document.createElement('div');
-    header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;';
-    header.innerHTML = '<strong style="font-size: 13px; color: #1e1b4b;">👥 ' + escapeHtml(g.groupName) + '</strong><span style="font-size: 10px; background: #e0e7ff; color: #3730a3; padding: 2px 7px; border-radius: 10px; font-weight: 600;">' + (g.fields || []).length + ' questions</span>';
+    header.className = 'group-card-header';
+    header.innerHTML = '<span class="group-card-title">👥 ' + escapeHtml(g.groupName) + '</span><span class="group-count-tag">' + (g.fields || []).length + ' questions</span>';
 
     const desc = document.createElement('div');
-    desc.style.cssText = 'color: #64748b; font-size: 10px; margin-bottom: 8px;';
+    desc.className = 'group-desc';
     desc.textContent = g.description || '';
 
     const list = document.createElement('div');
-    list.style.cssText = 'padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin-bottom: 10px; font-size: 11px;';
+    list.className = 'group-fields-box';
     (g.fields || []).forEach(f => {
       const item = document.createElement('div');
-      item.style.cssText = 'padding: 2px 0; color: #334155; display: flex; justify-content: space-between; align-items: center;';
-      item.innerHTML = '<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px;">• ' + escapeHtml(f.label) + '</span><small style="color: #64748b; margin-left: 6px;">' + escapeHtml(f.type || 'text') + '</small>';
+      item.className = 'group-field-line';
+      item.innerHTML = '<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px;">• ' + escapeHtml(f.label) + '</span><span class="field-type-badge">' + escapeHtml(f.type || 'text') + '</span>';
       list.appendChild(item);
     });
 
@@ -250,20 +280,24 @@ function renderAiGroupCards(groups, origin) {
     createBtn.id = 'ai-create-btn-' + idx;
     createBtn.type = 'button';
     createBtn.className = 'button primary wide';
-    createBtn.style.cssText = 'background: #4f46e5; font-size: 11px; min-height: 32px; font-weight: 600;';
+    createBtn.style.cssText = 'background: #4f46e5; font-size: 11.5px; min-height: 34px;';
     createBtn.textContent = 'Generate QR / Link for ' + g.groupName;
     createBtn.onclick = () => createQrForGroupCard(g, idx, origin);
 
     // Result frame for this specific group's QR & link
     const resultBox = document.createElement('div');
     resultBox.id = 'ai-result-box-' + idx;
-    resultBox.style.cssText = 'display: none; margin-top: 10px; text-align: center; border-top: 1px dashed #cbd5e1; padding-top: 10px; background: #fdfdfd; border-radius: 6px;';
+    resultBox.className = 'group-qr-frame';
+    resultBox.style.display = 'none';
     resultBox.innerHTML = `
-      <div style="font-weight: 700; color: #0d6b61; font-size: 11px; margin-bottom: 6px;">QR for ${escapeHtml(g.groupName)}</div>
-      <img id="ai-qr-img-${idx}" style="width: 130px; height: 130px; border-radius: 6px; border: 1px solid #cbd5e1; padding: 4px; display: block; margin: 0 auto 8px auto; background: white;">
-      <a id="ai-link-${idx}" target="_blank" style="font-size: 10px; color: #2563eb; word-break: break-all; display: block; margin-bottom: 6px; text-decoration: underline;"></a>
-      <button id="ai-copy-btn-${idx}" type="button" class="button secondary wide" style="min-height: 28px; font-size: 10px;">📋 Copy Link for ${escapeHtml(g.groupName)}</button>
-      <div style="font-size: 10px; color: #059669; font-weight: 600; margin-top: 6px;">✓ Separate link ready to send!</div>
+      <div style="font-weight: 700; color: #0f172a; font-size: 12px; margin-bottom: 6px;">QR Code for ${escapeHtml(g.groupName)}</div>
+      <img id="ai-qr-img-${idx}" class="qr-img" alt="QR Code">
+      <a id="ai-link-${idx}" target="_blank" class="group-qr-link"></a>
+      <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+        <button id="ai-copy-btn-${idx}" type="button" class="button secondary" style="flex: 1; min-height: 30px; font-size: 10.5px;">📋 Copy Link</button>
+        <button id="ai-dl-btn-${idx}" type="button" class="button secondary" style="min-height: 30px; font-size: 10.5px;">💾 Save QR</button>
+      </div>
+      <div style="font-size: 10.5px; color: #059669; font-weight: 600;">✓ Dedicated link ready for ${escapeHtml(g.groupName)}</div>
     `;
 
     card.append(header, desc, list, createBtn, resultBox);
@@ -277,10 +311,11 @@ async function createQrForGroupCard(g, idx, origin) {
   const qrImg = document.getElementById('ai-qr-img-' + idx);
   const linkEl = document.getElementById('ai-link-' + idx);
   const copyBtn = document.getElementById('ai-copy-btn-' + idx);
+  const dlBtn = document.getElementById('ai-dl-btn-' + idx);
 
   if (btn) {
     btn.disabled = true;
-    btn.textContent = 'Generating QR...';
+    btn.textContent = '⏳ Creating QR...';
   }
 
   try {
@@ -292,25 +327,27 @@ async function createQrForGroupCard(g, idx, origin) {
     const req = result.request;
 
     if (btn) {
-      btn.textContent = '✓ ' + g.groupName + ' Link Created';
+      btn.textContent = '✓ ' + g.groupName + ' QR Active';
       btn.style.background = '#059669';
       btn.disabled = false;
     }
 
     if (resultBox && qrImg && linkEl) {
-      qrImg.src = base + '/api/requests/' + req.id + '/qr.png';
+      const qrUrl = base + '/api/requests/' + req.id + '/qr.png';
+      qrImg.src = qrUrl;
       linkEl.href = req.url;
       linkEl.textContent = req.url;
+      
       if (copyBtn) {
-        copyBtn.onclick = async () => {
-          await navigator.clipboard.writeText(req.url);
-          notify('Copied link for ' + g.groupName + '!');
-        };
+        copyBtn.onclick = () => copyText(req.url, copyBtn, '📋 Copy Link');
+      }
+      if (dlBtn) {
+        dlBtn.onclick = () => downloadImage(qrUrl, 'formrelay-' + g.groupName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '.png');
       }
       resultBox.style.display = 'block';
     }
 
-    notify('Created delegation link for ' + g.groupName + '!');
+    notify('Generated QR and link for ' + g.groupName + '!');
   } catch (err) {
     if (btn) {
       btn.disabled = false;

@@ -1,24 +1,131 @@
-/* popup.js — FormRelay (AI Smart Field Grouping edition) */
-'use strict';
-
 const $ = id => document.getElementById(id);
-const base = $('base');
-
-let scannedFields = [];
-let aiGroups      = [];
-
-// Restore state
-chrome.storage.local.get(['formrelayBase', 'formrelaySelected', 'formrelayStatus'], d => {
-  if (d.formrelayBase) base.value = d.formrelayBase;
-  showSelected(d.formrelaySelected || []);
-  if (d.formrelayStatus) $('message').textContent = d.formrelayStatus;
-});
-
-function showSelected(fields) {
-  $('fields').textContent = fields.length
-    ? fields.map(f => `[✓] ${f.label}`).join('\n')
-    : 'No fields selected yet';
+let tabId = null, state = null, busy = false, epoch = 0, refreshTimer = null;
+let history = [], viewRequestId = null, viewTabId = null;
+const labels={waiting:'Pending',received:'Response Received',completed:'Autofilled',partial:'Partially Failed',expired:'Expired',unavailable:'Original Form Unavailable',unauthorized:'Access denied',offline:'Pending - reconnecting'};
+const viewedRequest=()=>history.find(r=>r.id===viewRequestId)||state?.request;
+function backendOrigin(value) {
+  const url = new URL(value);
+  if(url.username||url.password||url.pathname!=='/'||url.search||url.hash||!((url.protocol==='http:'&&url.hostname==='localhost')||(url.protocol==='https:'&&url.hostname.endsWith('.onrender.com')&&!url.port)))throw Error('Use a localhost backend or an HTTPS onrender.com origin, with no path.');
+  return url.origin;
 }
+function notify(text, kind='success') { $('message').textContent=text; $('message').className='notice '+kind; $('message').hidden=!text; }
+function section(name) {
+  document.querySelectorAll('[data-tab]').forEach(button=>{const selected=button.dataset.tab===name;button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;$('panel-'+button.dataset.tab).hidden=!selected});
+}
+async function worker(action, extra={}) {
+  const result = await chrome.runtime.sendMessage({action,tabId,...extra});
+  if(result?.ok===false)throw Error(result.error||'Operation failed. Reopen FormRelay and retry.');
+  return result;
+}
+async function content(action,extra={}) {
+  if(!tabId)throw Error('Open an ordinary web form tab first.');
+  const response = await chrome.tabs.sendMessage(tabId,{action,...extra});
+  if(response?.ok===false)throw Error(response.error);
+  return response;
+}
+async function ensure() {
+  try { const ping=await content('PING');if(ping?.version==='0.4.0')return; } catch {}
+  try {
+    await chrome.scripting.executeScript({target:{tabId},files:['content.js']});
+    const ping=await content('PING');if(ping?.version!=='0.4.0')throw Error('Refresh this webpage once after updating the extension source.');
+  }catch(error){throw Error('Cannot connect to this page. Open a normal website, activate FormRelay from its toolbar icon, and retry. After editing extension source, refresh the page. '+error.message)}
+}
+async function saveSettings() {
+  const origin=backendOrigin($('base').value),key=$('accessKey').value.trim();
+  const saved=(await chrome.storage.session.get('formrelayAccess')).formrelayAccess;
+  if(saved?.key&&saved.origin!==origin&&saved.key===key)throw Error('Backend changed. Clear the old key and enter the key for this backend.');
+  await chrome.storage.local.set({formrelayBase:origin});await chrome.storage.session.set({formrelayAccess:{origin,key}});$('base').value=origin;return origin;
+}
+async function refresh() {
+  const mine=++epoch;
+  try {
+    const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
+    if(!tab?.id||!/^https?:/.test(tab.url||''))throw Error('Open a form on an ordinary HTTP or HTTPS website first. Browser settings pages are not supported.');
+    if(viewTabId!==tab.id){viewRequestId=null;viewTabId=tab.id}
+    tabId=tab.id;$('website').textContent=new URL(tab.url).hostname;
+    await ensure();const snapshot=await content('GET_STATE');if(mine!==epoch)return;
+    const saved=await worker('GET_REQUESTS');if(mine!==epoch)return;
+    state=snapshot;history=saved.requests||snapshot.requests||(snapshot.request?[snapshot.request]:[]);
+    history=history.map(r=>{const live=snapshot.requests?.find(item=>item.id===r.id);return live?{...r,...live,tabId:tab.id}:r});
+    if(!viewRequestId||!history.some(r=>r.id===viewRequestId))viewRequestId=snapshot.request?.id||history.at(-1)?.id||null;
+    render();$('connection').textContent='Connected to this page';$('connection-dot').className='dot online';
+    if(state.status)notify(state.status,/failed|denied|unavailable|expired|interrupted/i.test(state.status)?'error':'success');
+  }catch(error){if(mine!==epoch)return;state=null;render();$('connection').textContent='Page connection needs attention';$('connection-dot').className='dot offline';notify(error.message,'error')}
+}
+function row(field, removable) {
+  const li=document.createElement('li');li.className='field-row';
+  const icon=document.createElement('span');icon.className='field-type';icon.textContent=field.type==='checkbox-group'?'[]':field.type==='checkbox'?'[]':field.type==='radio'?'O':field.type==='select'?'v':'Aa';icon.setAttribute('aria-hidden','true');
+  const text=document.createElement('div');text.className='field-label';const label=document.createElement('strong');label.textContent=field.label;const type=document.createElement('small');type.textContent=field.type;text.append(label,type);li.append(icon,text);
+  if(removable){const remove=document.createElement('button');remove.className='remove-field';remove.textContent='x';remove.setAttribute('aria-label','Remove '+field.label);remove.disabled=busy||state?.creating;remove.onclick=()=>operate('Removing field',()=>content('REMOVE_FIELD',{key:field.key}));li.appendChild(remove)}return li;
+}
+function results(container,items,processing=false,requestId=null) {
+  container.replaceChildren();
+  for(const item of items){const p=document.createElement('p');const strong=document.createElement('strong');strong.textContent=item.label+': ';p.append(strong,document.createTextNode(item.state+' - '+(item.detail||'')));container.appendChild(p);
+    if(item.needsConfirmation){const button=document.createElement('button');button.className='button secondary';button.textContent='Confirm replacement for '+item.label;button.disabled=processing||busy;button.onclick=()=>operate('Preparing mapping confirmation',async()=>{await content('CONFIRM_MAPPING',{key:item.key,requestId});notify('Close this popup and click the matching unanswered replacement for '+item.label)});container.appendChild(button)}
+    if(item.needsOverwrite){const button=document.createElement('button');button.className='button secondary';button.textContent='Replace existing answer for '+item.label;button.disabled=processing||busy;button.onclick=()=>{if(window.confirm('Replace the existing answer for '+item.label+' with this request’s response?'))operate('Replacing confirmed answer',()=>content('CONFIRM_OVERWRITE',{key:item.key,requestId:requestId||state?.request?.id}))};container.appendChild(button)}
+  }
+}
+function render() {
+  const selected=state?.selection||[],request=viewedRequest(),locked=state?.creating||state?.busy||busy;
+  $('tab-count').textContent=selected.length;$('selection-count').textContent=selected.length+' selected';$('empty-fields').hidden=selected.length>0||!!request;
+  $('fields').replaceChildren(...selected.map(f=>row(f,true)));$('select').disabled=!state||locked;$('finish').disabled=!state?.selecting||busy;
+  $('clear').disabled=!selected.length||locked;$('create').disabled=!selected.length||locked;$('check').disabled=!state||busy;
+  $('selection-hint').textContent=state?.selecting?'Selection mode is on':'Earlier requests keep their own mappings';
+  $('new-fields').hidden=!history.length;$('new-fields').disabled=busy||state?.creating;
+  $('request-picker').replaceChildren(...history.map(r=>{const option=document.createElement('option');option.value=r.id;option.textContent=r.id.slice(0,8)+' - '+(labels[r.phase]||r.phase||'Pending')+' - '+(r.sourceOrigin||'this page')+(r.tabId&&r.tabId!==tabId?' (another tab)':'');return option}));$('request-picker').value=viewRequestId||'';$('request-picker').disabled=busy||!history.length;
+  $('empty-request').hidden=!!request;$('request-card').hidden=!request;$('request-dot').hidden=!request;
+  if(!request)return;
+  $('request-origin').textContent='Original page: '+(request.sourcePath||'this document')+'. Replaced controls require confirmation.';
+  $('request-status').textContent=labels[request.phase]||request.phase;$('request-title').textContent=labels[request.phase]||'Request ready';
+  $('request-description').textContent=request.phase==='completed'?'Values were checked after page events. Review them before submitting.':request.phase==='partial'?'Some questions need attention. Your original page is never submitted by FormRelay.':request.phase==='offline'?'The server is unavailable. FormRelay retries while the original tab stays open.':'Share this link or QR with your collaborator.';
+  const qr=request.base+'/api/requests/'+request.id+'/qr.png';if($('qr').getAttribute('src')!==qr)$('qr').src=qr;
+  $('qr').hidden=['expired','unauthorized'].includes(request.phase);$('link').value=request.url||'';$('copy').disabled=busy||['expired','unauthorized'].includes(request.phase);
+  $('requested-fields').replaceChildren(...request.fields.map(f=>{const li=document.createElement('li');li.textContent=f.label;return li}));
+  const local=(!request.tabId||request.tabId===tabId)&&state?.requests?.some(r=>r.id===request.id);
+  results($('results'),request.results||[],state?.busy||!local,request.id);$('undo').disabled=busy||state?.busy||!local||!(request.results||[]).some(f=>f.state==='verified');
+  if(request.phase==='unavailable')$('request-description').textContent='The original tab is closed or on another page. Answers will never be inserted here. If the tab still exists, return to its exact original URL and confirm mappings.';
+  $('new-request').disabled=busy||!state||state.creating;expiry();
+}
+function expiry() { const request=viewedRequest(),value=request?.expiresAt;if(!value){$('expiry').textContent='Link expires about 30 minutes after creation.';return}if(value<=Date.now()&&!['completed','partial','expired'].includes(request.phase)){request.phase='expired';render();return}const left=Math.max(0,Math.ceil((value-Date.now())/60000));$('expiry').textContent=left?'Expires in about '+left+' minute'+(left===1?'':'s')+'.':'This link has expired. Create a new request.'; }
+async function operate(label,action,tabAfter=null) {
+  if(busy)return;busy=true;render();notify(label+'...','loading');
+  try{await action();if(tabAfter)section(tabAfter);await refresh()}catch(error){notify(error.message,'error')}finally{busy=false;render()}
+}
+async function newRequest() {
+  await content('NEW_REQUEST');await worker('CLEAR_REQUEST');$('compatibility').replaceChildren();section('fields');
+}
+$('select').onclick=()=>operate('Starting selection',()=>content('START'));
+$('finish').onclick=()=>operate('Finishing selection',()=>content('STOP'));
+$('clear').onclick=()=>operate('Clearing selection',()=>content('CLEAR'));
+$('create').onclick=()=>operate('Generating request and QR',async()=>{const base=await saveSettings();const result=await worker('CREATE_REQUEST',{base});viewRequestId=result.request.id},'requests');
+$('new-request').onclick=$('new-fields').onclick=()=>operate('Starting a new request',newRequest);
+$('undo').onclick=()=>operate('Restoring inserted values',()=>content('UNDO',{requestId:viewedRequest()?.id}));
+$('request-picker').onchange=()=>{const id=$('request-picker').value;return operate('Opening saved request',async()=>{viewRequestId=id;if(state?.requests?.some(r=>r.id===id))await content('SELECT_REQUEST',{requestId:id})})};
+$('refresh').onclick=()=>refresh();$('go-fields').onclick=()=>section('fields');
+$('copy').onclick=async()=>{try{await navigator.clipboard.writeText(viewedRequest().url);notify('Request link copied. Share only this link.')}catch{$('link').focus();$('link').select();notify('Select the link and press Ctrl+C to copy.','error')}};
+$('qr').onerror=()=>{if(state?.request&&!['expired','unauthorized'].includes(state.request.phase))notify('QR image unavailable. Check the backend in Settings; the request link may still work.','error')};
+$('test-connection').onclick=()=>operate('Testing backend connection',async()=>{const base=await saveSettings();await worker('TEST_CONNECTION',{base});$('settings-status').textContent='Backend connected successfully. The access key is checked when creating a request.'});
+$('check').onclick=()=>operate('Checking compatibility',async()=>{
+  const report=await content('CHECK'),container=$('compatibility');container.replaceChildren();
+  const summary=document.createElement('p');summary.textContent=report.fields.filter(f=>f.supported).length+' supported unanswered fields; '+report.fields.filter(f=>!f.supported).length+' unavailable. '+report.limitations;container.appendChild(summary);
+  if(report.duplicates){const warning=document.createElement('p');warning.textContent='Repeated labels detected. Exact clicked elements stay separate; replaced elements need confirmation.';container.appendChild(warning)}
+  results(container.appendChild(document.createElement('div')),report.selected,report.busy);
+  const details=document.createElement('details'),heading=document.createElement('summary');heading.textContent='Show field compatibility';details.appendChild(heading);
+  for(const f of report.fields){const p=document.createElement('p');p.textContent=f.label+' ['+f.type+']: '+(f.supported?'Supported':f.reason)+' - '+f.location;details.appendChild(p)}
+  if(report.frames||report.custom||report.truncated){const p=document.createElement('p');p.textContent=report.frames+' frames and '+report.custom+' custom widgets detected. '+(report.truncated?'Scan limited to 1000 controls.':'Use only fields reported as supported.');details.appendChild(p)}container.appendChild(details);
+});
+document.querySelectorAll('[data-tab]').forEach(button=>{button.onclick=()=>section(button.dataset.tab);button.onkeydown=event=>{const buttons=[...document.querySelectorAll('[data-tab]')];let index=buttons.indexOf(button);if(event.key==='ArrowRight')index=(index+1)%buttons.length;else if(event.key==='ArrowLeft')index=(index+buttons.length-1)%buttons.length;else if(event.key==='Home')index=0;else if(event.key==='End')index=buttons.length-1;else return;event.preventDefault();section(buttons[index].dataset.tab);buttons[index].focus()}});
+chrome.storage.onChanged?.addListener((changes,area)=>{if(area==='session'&&Object.keys(changes).some(key=>key.startsWith('formrelay.tab.'))){clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>{if(!busy)refresh()},120)}});
+chrome.tabs.onActivated?.addListener(()=>refresh());
+chrome.tabs.onUpdated?.addListener((id,change)=>{if(id===tabId&&change.status==='complete')refresh()});
+(async()=>{const saved=await chrome.storage.local.get('formrelayBase');$('base').value=saved.formrelayBase||'http://localhost:3000';const access=(await chrome.storage.session.get('formrelayAccess')).formrelayAccess;if(access?.origin===$('base').value)$('accessKey').value=access.key;await refresh()})().catch(error=>notify(error.message,'error'));
+setInterval(expiry,1000);
+
+// =============================================================
+// AI Smart Field Grouping Feature
+// =============================================================
+let scannedFields = [];
+let aiGroups = [];
 
 function escapeHtml(str) {
   return String(str || '')
@@ -28,246 +135,224 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-function serverOrigin() {
-  try { return new URL(base.value).origin; }
-  catch { return 'http://localhost:3000'; }
-}
-
-async function activeTab() {
-  const [t] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!t?.id) throw new Error('Open a form tab first');
-  return t;
-}
-
-async function sendToContent(action, extra = {}) {
-  const t = await activeTab();
+async function copyText(text, btn, originalText) {
   try {
-    return await chrome.tabs.sendMessage(t.id, { action, ...extra });
-  } catch (_) {
-    await chrome.scripting.executeScript({ target: { tabId: t.id }, files: ['content.js'] });
-    return await chrome.tabs.sendMessage(t.id, { action, ...extra });
-  }
-}
-
-function setMsg(text, color = '#0284c7') {
-  const el = $('message');
-  el.textContent = text;
-  el.style.color = color;
-}
-
-// -------------------------------------------------------------
-// AI Group Flow
-// -------------------------------------------------------------
-
-$('btn-ai-group').onclick = async () => {
-  try {
-    setMsg('Scanning fields on current tab...');
-    const res = await sendToContent('SCAN_FIELDS');
-
-    if (!res || !res.ok || !res.fields || res.fields.length === 0) {
-      setMsg('No supported form fields detected on this page. Navigate to http://localhost:3000/demo first.', '#dc2626');
-      return;
+    await navigator.clipboard.writeText(text);
+    if (btn) {
+      btn.textContent = '✓ Copied!';
+      btn.style.color = '#10b981';
+      btn.style.borderColor = '#10b981';
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.style.color = '';
+        btn.style.borderColor = '';
+      }, 2000);
     }
-
-    scannedFields = res.fields;
-    $('ai-scan-summary').textContent =
-      `Found ${scannedFields.length} field${scannedFields.length !== 1 ? 's' : ''} on this form. ` +
-      `AI will group them by who fills them out.`;
-
-    $('ai-panel').style.display    = 'block';
-    $('ai-approval').style.display = 'block';
-    $('ai-loading').style.display  = 'none';
-    $('ai-results').style.display  = 'none';
-    setMsg('');
+    notify('Link copied to clipboard!');
   } catch (e) {
-    setMsg(`Error scanning form: ${e.message}`, '#dc2626');
+    notify('Press Ctrl+C to copy', 'error');
   }
-};
+}
 
-$('ai-close').onclick  = () => { $('ai-panel').style.display = 'none'; };
-$('ai-cancel').onclick = () => { $('ai-panel').style.display = 'none'; };
+function downloadImage(url, filename) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'formrelay-qr.png';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  notify('QR Code downloaded!');
+}
 
-$('btn-skip-ai').onclick = () => {
+const aiBtn = $('btn-ai-group');
+if (aiBtn) {
+  aiBtn.onclick = async () => {
+    try {
+      notify('Scanning webpage questions for AI segregation...', 'loading');
+      await ensure();
+      const res = await content('SCAN_FIELDS');
+      if (!res?.ok || !res.fields?.length) {
+        throw new Error('No supported questions found on this form. Open a Google Form or demo form first.');
+      }
+      scannedFields = res.fields;
+      $('ai-scan-summary').textContent = 'Detected ' + scannedFields.length + ' supported questions on this form.';
+      $('ai-panel').style.display = 'block';
+      $('ai-approval').style.display = 'block';
+      $('ai-loading').style.display = 'none';
+      $('ai-results').style.display = 'none';
+      notify('');
+    } catch (err) {
+      notify(err.message, 'error');
+    }
+  };
+}
+
+if ($('ai-close')) $('ai-close').onclick = () => { $('ai-panel').style.display = 'none'; };
+if ($('ai-cancel')) $('ai-cancel').onclick = () => { $('ai-panel').style.display = 'none'; };
+if ($('btn-skip-ai')) $('btn-skip-ai').onclick = () => {
   $('ai-panel').style.display = 'none';
-  setMsg('Manual mode enabled. Click "1. Manual Select" to choose fields.');
+  notify('Switched to manual selection. Click "+ Start selection".');
 };
 
-$('ai-confirm').onclick = async () => {
-  $('ai-approval').style.display = 'none';
-  $('ai-loading').style.display  = 'block';
-  $('ai-results').style.display  = 'none';
+if ($('ai-confirm')) {
+  $('ai-confirm').onclick = async () => {
+    $('ai-approval').style.display = 'none';
+    $('ai-loading').style.display = 'block';
+    $('ai-results').style.display = 'none';
 
-  try {
-    const origin = serverOrigin();
-    const resp = await fetch(`${origin}/api/ai/group-fields`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields: scannedFields })
-    });
+    try {
+      const origin = backendOrigin($('base').value);
+      const resp = await fetch(origin + '/api/ai/group-fields', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: scannedFields })
+      });
+      const data = await resp.json().catch(() => ({ ok: false, error: 'Invalid response from server' }));
+      $('ai-loading').style.display = 'none';
 
-    const data = await resp.json().catch(() => ({ ok: false, error: 'Invalid response from backend server' }));
-    $('ai-loading').style.display = 'none';
+      if (!data.ok) {
+        $('ai-approval').style.display = 'block';
+        notify('AI Error: ' + data.error, 'error');
+        return;
+      }
 
-    if (!data.ok) {
+      aiGroups = data.groups || [];
+      if (!aiGroups.length) {
+        $('ai-approval').style.display = 'block';
+        notify('No separable member groups found.', 'error');
+        return;
+      }
+
+      renderAiGroupCards(aiGroups, origin);
+      $('ai-results').style.display = 'block';
+      notify('AI segregated ' + aiGroups.length + ' group(s)! Individual QRs ready below.');
+    } catch (err) {
+      $('ai-loading').style.display = 'none';
       $('ai-approval').style.display = 'block';
-      const hint = data.needsApiKey ? ' (Set GEMINI_API_KEY in server/.env)' : '';
-      setMsg(`AI Error: ${data.error}${hint}`, '#dc2626');
-      return;
+      notify('Network error connecting to backend: ' + err.message, 'error');
     }
+  };
+}
 
-    aiGroups = data.groups || [];
-    if (aiGroups.length === 0) {
-      $('ai-approval').style.display = 'block';
-      setMsg('AI found no separable groups. Try manual selection.', '#b45309');
-      return;
-    }
-
-    renderGroupCards(aiGroups, origin);
-    $('ai-results').style.display = 'block';
-    setMsg(`AI classified into ${aiGroups.length} group${aiGroups.length !== 1 ? 's' : ''}.`, '#059669');
-  } catch (e) {
-    $('ai-loading').style.display  = 'none';
-    $('ai-approval').style.display = 'block';
-    setMsg(`Network error connecting to backend: ${e.message}`, '#dc2626');
-  }
-};
-
-function renderGroupCards(groups, origin) {
+function renderAiGroupCards(groups, origin) {
   const container = $('group-cards-container');
-  container.innerHTML = '';
+  container.replaceChildren();
+
+  // Top action: generate for all groups at once
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = 'button primary wide';
+  allBtn.style.cssText = 'background: #0d9488; margin-bottom: 12px; font-weight: 700; font-size: 12px; min-height: 36px; box-shadow: 0 2px 6px rgba(13,148,136,0.3);';
+  allBtn.textContent = '⚡ Generate QRs for All Groups (' + groups.length + ')';
+  allBtn.onclick = async () => {
+    allBtn.disabled = true;
+    allBtn.textContent = '⏳ Generating all QRs...';
+    for (let i = 0; i < groups.length; i++) {
+      await createQrForGroupCard(groups[i], i, origin);
+    }
+    allBtn.textContent = '✓ All ' + groups.length + ' QRs Generated!';
+    allBtn.style.background = '#059669';
+  };
+  container.appendChild(allBtn);
 
   groups.forEach((g, idx) => {
     const card = document.createElement('div');
     card.className = 'group-card';
-    card.innerHTML = `
-      <div class="group-header">
-        <span class="group-name">👥 ${escapeHtml(g.groupName)}</span>
-      </div>
-      <div class="group-desc">${escapeHtml(g.description || '')}</div>
-      <div class="group-fields-list">
-        ${(g.fields || []).map(f =>
-          `<div class="group-field-item">
-             • ${escapeHtml(f.label)}
-             <span class="field-type-tag">${escapeHtml(f.type || 'text')}</span>
-           </div>`
-        ).join('')}
-      </div>
-      <button class="btn-create-group" id="btn-grp-${idx}" type="button">
-        Create QR for ${escapeHtml(g.groupName)}
-      </button>
-      <img class="qr-mini" id="qr-group-${idx}" alt="QR" style="display:none">
-      <a class="group-link" id="link-group-${idx}" target="_blank"></a>
-      <div class="group-status" id="status-group-${idx}"></div>
-    `;
-    container.appendChild(card);
 
-    document.getElementById(`btn-grp-${idx}`).onclick = () => createQrForGroup(idx, g, origin);
+    const header = document.createElement('div');
+    header.className = 'group-card-header';
+    header.innerHTML = '<span class="group-card-title">👥 ' + escapeHtml(g.groupName) + '</span><span class="group-count-tag">' + (g.fields || []).length + ' questions</span>';
+
+    const desc = document.createElement('div');
+    desc.className = 'group-desc';
+    desc.textContent = g.description || '';
+
+    const list = document.createElement('div');
+    list.className = 'group-fields-box';
+    (g.fields || []).forEach(f => {
+      const item = document.createElement('div');
+      item.className = 'group-field-line';
+      item.innerHTML = '<span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 250px;">• ' + escapeHtml(f.label) + '</span><span class="field-type-badge">' + escapeHtml(f.type || 'text') + '</span>';
+      list.appendChild(item);
+    });
+
+    const createBtn = document.createElement('button');
+    createBtn.id = 'ai-create-btn-' + idx;
+    createBtn.type = 'button';
+    createBtn.className = 'button primary wide';
+    createBtn.style.cssText = 'background: #4f46e5; font-size: 11.5px; min-height: 34px;';
+    createBtn.textContent = 'Generate QR / Link for ' + g.groupName;
+    createBtn.onclick = () => createQrForGroupCard(g, idx, origin);
+
+    // Result frame for this specific group's QR & link
+    const resultBox = document.createElement('div');
+    resultBox.id = 'ai-result-box-' + idx;
+    resultBox.className = 'group-qr-frame';
+    resultBox.style.display = 'none';
+    resultBox.innerHTML = `
+      <div style="font-weight: 700; color: #0f172a; font-size: 12px; margin-bottom: 6px;">QR Code for ${escapeHtml(g.groupName)}</div>
+      <img id="ai-qr-img-${idx}" class="qr-img" alt="QR Code">
+      <a id="ai-link-${idx}" target="_blank" class="group-qr-link"></a>
+      <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+        <button id="ai-copy-btn-${idx}" type="button" class="button secondary" style="flex: 1; min-height: 30px; font-size: 10.5px;">📋 Copy Link</button>
+        <button id="ai-dl-btn-${idx}" type="button" class="button secondary" style="min-height: 30px; font-size: 10.5px;">💾 Save QR</button>
+      </div>
+      <div style="font-size: 10.5px; color: #059669; font-weight: 600;">✓ Dedicated link ready for ${escapeHtml(g.groupName)}</div>
+    `;
+
+    card.append(header, desc, list, createBtn, resultBox);
+    container.appendChild(card);
   });
 }
 
-async function createQrForGroup(idx, group, origin) {
-  const btn    = $(`btn-grp-${idx}`);
-  const qrImg  = $(`qr-group-${idx}`);
-  const linkEl = $(`link-group-${idx}`);
-  const status = $(`status-group-${idx}`);
+async function createQrForGroupCard(g, idx, origin) {
+  const btn = document.getElementById('ai-create-btn-' + idx);
+  const resultBox = document.getElementById('ai-result-box-' + idx);
+  const qrImg = document.getElementById('ai-qr-img-' + idx);
+  const linkEl = document.getElementById('ai-link-' + idx);
+  const copyBtn = document.getElementById('ai-copy-btn-' + idx);
+  const dlBtn = document.getElementById('ai-dl-btn-' + idx);
 
-  btn.disabled    = true;
-  btn.textContent = 'Generating QR...';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Creating QR...';
+  }
 
   try {
-    const keys = (group.fields || []).map(f => f.key);
-    const selResult = await sendToContent('SET_SELECTION', { keys });
-    if (!selResult?.ok) throw new Error('Could not highlight fields on the page.');
+    const keys = (g.fields || []).map(f => f.key);
+    await content('SET_SELECTION', { keys });
 
-    const stored = await chrome.storage.local.get('formrelaySelected');
-    const selectedFields = stored.formrelaySelected || [];
-    showSelected(selectedFields);
+    const base = await saveSettings();
+    const result = await worker('CREATE_REQUEST', { base });
+    const req = result.request;
 
-    chrome.storage.local.set({ formrelayBase: origin });
-    const r = await fetch(`${origin}/api/requests`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields: selectedFields })
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || `Server error ${r.status}`);
+    if (btn) {
+      btn.textContent = '✓ ' + g.groupName + ' QR Active';
+      btn.style.background = '#059669';
+      btn.disabled = false;
+    }
 
-    await sendToContent('TRACK', { track: { base: origin, id: data.id, token: data.ownerToken } });
+    if (resultBox && qrImg && linkEl) {
+      const qrUrl = base + '/api/requests/' + req.id + '/qr.png';
+      qrImg.src = qrUrl;
+      linkEl.href = req.url;
+      linkEl.textContent = req.url;
+      
+      if (copyBtn) {
+        copyBtn.onclick = () => copyText(req.url, copyBtn, '📋 Copy Link');
+      }
+      if (dlBtn) {
+        dlBtn.onclick = () => downloadImage(qrUrl, 'formrelay-' + g.groupName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '.png');
+      }
+      resultBox.style.display = 'block';
+    }
 
-    qrImg.src           = `${origin}/api/requests/${data.id}/qr.png`;
-    qrImg.style.display = 'block';
-    linkEl.href         = data.url;
-    linkEl.textContent  = data.url;
-    status.textContent  = `✓ Ready for ${group.groupName}!`;
-    btn.textContent     = '✓ QR Generated';
-    btn.style.background = '#059669';
-
-    setMsg(`QR created for "${group.groupName}". Send link or scan code.`, '#059669');
-  } catch (e) {
-    btn.disabled    = false;
-    btn.textContent = `Create QR for ${group.groupName}`;
-    status.textContent = `Error: ${e.message}`;
-    setMsg(e.message, '#dc2626');
+    notify('Generated QR and link for ' + g.groupName + '!');
+  } catch (err) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Generate QR / Link for ' + g.groupName;
+    }
+    notify('Error: ' + err.message, 'error');
   }
 }
-
-// -------------------------------------------------------------
-// Manual Selection Flow
-// -------------------------------------------------------------
-
-$('select').onclick = async () => {
-  try {
-    await sendToContent('START');
-    setMsg('Selection mode active. Close popup, then click inputs on the webpage.');
-  } catch (e) {
-    setMsg(e.message, '#dc2626');
-  }
-};
-
-$('finish').onclick = async () => {
-  try {
-    await sendToContent('STOP');
-    const d = await chrome.storage.local.get('formrelaySelected');
-    showSelected(d.formrelaySelected || []);
-    setMsg('Selection finished. Click "3. Create QR / Link" below.');
-  } catch (e) {
-    setMsg(e.message, '#dc2626');
-  }
-};
-
-$('create').onclick = async () => {
-  try {
-    const origin = serverOrigin();
-    const d = await chrome.storage.local.get('formrelaySelected');
-    if (!d.formrelaySelected?.length) throw new Error('Select fields first.');
-
-    chrome.storage.local.set({ formrelayBase: origin });
-
-    const r = await fetch(`${origin}/api/requests`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ fields: d.formrelaySelected })
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error || `Server error ${r.status}`);
-
-    await sendToContent('TRACK', { track: { base: origin, id: data.id, token: data.ownerToken } });
-
-    $('qr').src           = `${origin}/api/requests/${data.id}/qr.png`;
-    $('qr').style.display = 'block';
-    $('link').href        = data.url;
-    $('link').textContent = data.url;
-    setMsg('Request ready! Keep this browser tab open.');
-  } catch (e) {
-    setMsg(e.message, '#dc2626');
-  }
-};
-
-$('undo').onclick = async () => {
-  try {
-    await sendToContent('UNDO');
-    setMsg('Original values restored.');
-  } catch (e) {
-    setMsg(e.message, '#dc2626');
-  }
-};

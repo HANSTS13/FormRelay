@@ -1,1 +1,188 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Demo Scholarship Form</title><style>body{font-family:system-ui;max-width:570px;margin:30px auto;padding:20px}label{display:block;margin-top:18px}input{box-sizing:border-box;display:block;width:100%;padding:12px;margin-top:6px}button{padding:12px;margin-top:24px}</style></head><body><h1>Scholarship Application (Demo)</h1><p>Use test data only. Activate FormRelay in Chrome to select guardian fields.</p><form id="scholarship"><label>Student Name<input id="student_name" type="text" value="Demo Student"></label><label>Guardian Full Name<input id="guardian_name" type="text"></label><label>Guardian Occupation<input id="guardian_job" type="text"></label><label>Guardian Phone<input id="guardian_phone" type="tel"></label><label>Annual Family Income<input id="family_income" type="number"></label><button type="submit">Submit demo</button></form><script src="/demo.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Scholarship Application (Demo)</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      padding: 36px 16px;
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .header {
+      margin-bottom: 24px;
+    }
+    .tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--primary);
+      background: #eff6ff;
+      padding: 4px 10px;
+      border-radius: 20px;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    p.desc {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    .notice {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 0.88rem;
+      color: #1e40af;
+      margin-top: 14px;
+    }
+    .form-box {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 4px 20px -2px rgba(0,0,0,0.05);
+    }
+    .section-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #475569;
+      margin: 20px 0 12px 0;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+    .section-title:first-child {
+      margin-top: 0;
+    }
+    label {
+      display: block;
+      margin-top: 16px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    label span.hint {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    input, select {
+      box-sizing: border-box;
+      display: block;
+      width: 100%;
+      padding: 12px 14px;
+      margin-top: 6px;
+      font-size: 0.95rem;
+      background: #ffffff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 8px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus, select:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(37,99,235,0.15);
+    }
+    button[type="submit"] {
+      margin-top: 28px;
+      padding: 14px;
+      width: 100%;
+      background: #0f172a;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="tag">FormRelay AI Demo</span>
+      <h1>Scholarship Application Portal</h1>
+      <p class="desc">A standard official application containing applicant, parental, and institution verification fields.</p>
+      <div class="notice">
+        ✨ <strong>AI Smart Detection:</strong> Click the FormRelay extension icon and choose <strong>AI Analyze Form</strong>. The AI model will classify these questions into <em>Applicant</em>, <em>Parent / Guardian</em>, and <em>Institution</em> automatically!
+      </div>
+    </div>
+
+    <div class="form-box">
+      <form onsubmit="event.preventDefault(); alert('Demo submitted! No personal data was transferred.');">
+        <div class="section-title">Applicant Information</div>
+        <label>
+          Student Name
+          <input id="student_name" type="text" value="Alex M. Rivera">
+        </label>
+
+        <div class="section-title">Parent / Guardian Information</div>
+        <label>
+          Guardian Occupation
+          <span class="hint">Current employment, vocation, or professional livelihood</span>
+          <input id="guardian_job" type="text">
+        </label>
+
+        <label>
+          Guardian Relationship
+          <select id="guardian_relation">
+            <option value="">-- Specify Relationship --</option>
+            <option value="Mother">Mother</option>
+            <option value="Father">Father</option>
+            <option value="Legal Guardian">Legal Guardian</option>
+            <option value="Grandparent">Grandparent</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
+
+        <label>
+          Father's Annual Income
+          <span class="hint">Gross annual household remuneration before taxes (INR)</span>
+          <input id="family_income" type="number">
+        </label>
+
+        <label>
+          Parent Contact Number
+          <span class="hint">Telephonic contact number with area prefix</span>
+          <input id="guardian_phone" type="tel">
+        </label>
+
+        <div class="section-title">Institution Verification</div>
+        <label>
+          College Verification Number
+          <span class="hint">Institutional AISHE/AISCE registry identification code</span>
+          <input id="college_code" type="text" value="COL-REG-84920">
+        </label>
+
+        <button type="submit">Submit Completed Scholarship Application</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
