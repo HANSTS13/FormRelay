@@ -181,6 +181,166 @@
       border-color: #cbd5e1;
     }
     
+    /* AI Resume & Profile Autofill Card */
+    .ai-autofill-card {
+      background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+      border: 1.5px dashed #818cf8;
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      margin-bottom: 22px;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s ease;
+    }
+    .ai-autofill-card.drag-over {
+      border-color: var(--primary);
+      background: #e0e7ff;
+      transform: scale(1.01);
+    }
+    .ai-autofill-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .ai-autofill-title {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.95rem;
+      color: #312e81;
+    }
+    .ai-pill {
+      font-size: 11px;
+      font-weight: 700;
+      color: #4338ca;
+      background: #e0e7ff;
+      padding: 3px 8px;
+      border-radius: var(--radius-pill);
+      letter-spacing: 0.2px;
+    }
+    .ai-autofill-desc {
+      font-size: 0.83rem;
+      color: #4b5563;
+      margin-bottom: 14px;
+      line-height: 1.45;
+    }
+    .upload-dropzone {
+      background: #ffffff;
+      border: 1.5px dashed #cbd5e1;
+      border-radius: var(--radius-md);
+      padding: 18px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+    .upload-dropzone:hover {
+      border-color: var(--primary);
+      background: #faf5ff;
+    }
+    .dropzone-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .upload-icon {
+      font-size: 1.8rem;
+    }
+    .upload-text {
+      font-size: 0.85rem;
+      color: var(--text-body);
+    }
+    .btn-text-paste {
+      background: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      border-radius: var(--radius-pill);
+      padding: 5px 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-body);
+      cursor: pointer;
+      margin-top: 4px;
+      transition: all 0.15s;
+    }
+    .btn-text-paste:hover {
+      background: #e2e8f0;
+      color: var(--text-main);
+    }
+    .upload-status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--primary);
+      padding: 8px;
+    }
+    .btn-primary-sm {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-primary-sm:hover {
+      background: var(--primary-hover);
+    }
+
+    /* Voice Reader & AI Explainer Buttons */
+    .field-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .btn-field-tool {
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.15s;
+    }
+    .btn-field-tool:hover {
+      background: #eef2ff;
+      border-color: #c7d2fe;
+      color: var(--primary);
+    }
+    .explain-bubble {
+      margin-top: 8px;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: var(--radius-sm);
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      color: #1e40af;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      line-height: 1.4;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .field-sparkle {
+      animation: sparkleGlow 1.2s ease;
+    }
+    @keyframes sparkleGlow {
+      0% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.5); border-color: #10b981; }
+      100% { box-shadow: none; border-color: #cbd5e1; }
+    }
+
     /* Main Form Card */
     .form-card {
       background: var(--card-bg);
@@ -420,6 +580,41 @@
 
       <div class="action-bar">
         <button id="toggle-view" class="btn-secondary" type="button">📋 Show Original Legal Labels</button>
+      </div>
+    </div>
+
+    <!-- AI Resume & Profile Autofill Card -->
+    <div class="ai-autofill-card" id="ai-autofill-card">
+      <div class="ai-autofill-header">
+        <div class="ai-autofill-title">
+          <span style="font-size: 1.2rem;">✨</span>
+          <strong>AI Auto-Fill from Resume or Bio</strong>
+        </div>
+        <span class="ai-pill">Gemini Document AI</span>
+      </div>
+      <p class="ai-autofill-desc">Drop your PDF resume, document, or bio text to instantly extract and pre-populate your details in under 2 seconds.</p>
+      
+      <div class="upload-dropzone" id="dropzone">
+        <input type="file" id="resume-file" accept=".pdf,.txt,.doc,.docx" style="display: none;">
+        <div class="dropzone-content" id="dropzone-prompt">
+          <span class="upload-icon">📄</span>
+          <span class="upload-text"><strong>Click to Upload Resume (PDF / TXT)</strong> or drag &amp; drop file</span>
+          <div style="display: flex; gap: 8px; margin-top: 4px;">
+            <button type="button" class="btn-text-paste" id="btn-paste-bio">📝 Paste Bio / Profile Text</button>
+          </div>
+        </div>
+        <div id="upload-status" class="upload-status" style="display: none;">
+          <span class="spinner">⏳</span>
+          <span id="upload-status-text">AI is reading document &amp; extracting your details...</span>
+        </div>
+      </div>
+
+      <div id="paste-box-container" style="display: none; margin-top: 12px;">
+        <textarea id="paste-bio-input" placeholder="Paste your resume summary, LinkedIn bio, or team member details here..." rows="4"></textarea>
+        <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px;">
+          <button type="button" class="btn-secondary" id="btn-cancel-paste">Cancel</button>
+          <button type="button" class="btn-primary-sm" id="btn-submit-paste">✨ Extract with AI</button>
+        </div>
       </div>
     </div>
 

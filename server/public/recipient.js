@@ -8,6 +8,7 @@ const progressPercent = document.getElementById('progress-percent');
 
 let fields = [];
 let useSimplified = true;
+let progressTimeout = null;
 
 function escapeHtml(str) {
   return String(str || '')
@@ -16,6 +17,31 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
 }
+
+// ── Live Progress Beacon ───────────────────────────────────────────────────────
+
+function reportProgress(state = 'active') {
+  if (!fields.length) return;
+  clearTimeout(progressTimeout);
+  progressTimeout = setTimeout(() => {
+    let filled = 0;
+    for (const f of fields) {
+      const el = form.elements.namedItem(f.key);
+      if (el && el.value && el.value.trim().length > 0) filled++;
+    }
+    fetch(`/api/requests/${id}/progress`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: state,
+        filledCount: filled,
+        totalCount: fields.length
+      })
+    }).catch(() => {});
+  }, 400);
+}
+
+// ── Load Fields ───────────────────────────────────────────────────────────────
 
 async function load() {
   try {
@@ -26,11 +52,15 @@ async function load() {
       status.className = 'status-success';
       status.innerHTML = '<h3>✓ Request Already Completed</h3><p style="margin-top:8px">This request has already been answered and securely relayed back to the original form.</p>';
       form.style.display = 'none';
+      const aiCard = document.getElementById('ai-autofill-card');
+      if (aiCard) aiCard.style.display = 'none';
       return;
     }
     fields = data.fields || [];
     renderFields();
     updateProgress();
+    initDropzone();
+    reportProgress('opened');
   } catch (e) {
     status.className = 'status-error';
     status.textContent = '❌ ' + e.message;
@@ -50,7 +80,10 @@ function updateProgress() {
   if (progressBar) progressBar.style.width = pct + '%';
   if (progressText) progressText.textContent = `${filled} of ${fields.length} questions completed`;
   if (progressPercent) progressPercent.textContent = `${pct}%`;
+  reportProgress(filled === fields.length ? 'all_answered' : 'typing');
 }
+
+// ── Render Fields with Audio & AI Explainer ────────────────────────────────────
 
 function renderFields() {
   const currentValues = {};
@@ -68,21 +101,80 @@ function renderFields() {
     const labelRow = document.createElement('div');
     labelRow.className = 'field-label-row';
 
+    const titleWrap = document.createElement('div');
+    titleWrap.style.cssText = 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;';
+
     const questionTitle = document.createElement('label');
     questionTitle.className = 'question-title';
     questionTitle.htmlFor = f.key;
-    questionTitle.textContent = useSimplified ? (f.simplifiedLabel || f.label) : (f.originalLabel || f.label);
-
-    labelRow.appendChild(questionTitle);
+    const activeLabel = useSimplified ? (f.simplifiedLabel || f.label) : (f.originalLabel || f.label);
+    questionTitle.textContent = activeLabel;
+    titleWrap.appendChild(questionTitle);
 
     if (useSimplified && f.isSimplified) {
       const badge = document.createElement('span');
       badge.className = 'ai-tag';
-      badge.textContent = `✨ AI Clarified ${f.aiConfidence ? `(${f.aiConfidence})` : ''}`;
-      labelRow.appendChild(badge);
+      badge.textContent = `✨ AI Clarified`;
+      titleWrap.appendChild(badge);
+    }
+    labelRow.appendChild(titleWrap);
+
+    // Audio & Explainer Buttons
+    const toolsWrap = document.createElement('div');
+    toolsWrap.className = 'field-actions';
+
+    // 🔊 Listen
+    if ('speechSynthesis' in window) {
+      const listenBtn = document.createElement('button');
+      listenBtn.type = 'button';
+      listenBtn.className = 'btn-field-tool';
+      listenBtn.title = 'Listen to question';
+      listenBtn.innerHTML = '🔊 Read';
+      listenBtn.onclick = () => {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(activeLabel);
+        utter.rate = 0.95;
+        window.speechSynthesis.speak(utter);
+      };
+      toolsWrap.appendChild(listenBtn);
     }
 
+    // 💡 AI Explain
+    const explainBtn = document.createElement('button');
+    explainBtn.type = 'button';
+    explainBtn.className = 'btn-field-tool';
+    explainBtn.title = 'AI Question Guidance';
+    explainBtn.innerHTML = '💡 Explain';
+    toolsWrap.appendChild(explainBtn);
+
+    labelRow.appendChild(toolsWrap);
     block.appendChild(labelRow);
+
+    // Explain Bubble Container (Hidden by default)
+    const explainBox = document.createElement('div');
+    explainBox.className = 'explain-bubble';
+    explainBox.style.display = 'none';
+    block.appendChild(explainBox);
+
+    explainBtn.onclick = async () => {
+      if (explainBox.style.display === 'flex') {
+        explainBox.style.display = 'none';
+        return;
+      }
+      explainBox.style.display = 'flex';
+      explainBox.innerHTML = '<span>⏳</span><span>AI is generating helpful guidance...</span>';
+      try {
+        const resp = await fetch('/api/ai/explain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label: activeLabel })
+        });
+        const d = await resp.json();
+        explainBox.innerHTML = `<span>💡</span><div>${escapeHtml(d.explanation || f.aiHint || 'Provide official details.')}</div>`;
+      } catch {
+        explainBox.innerHTML = `<span>💡</span><div>${escapeHtml(f.aiHint || 'Enter your official information for this question.')}</div>`;
+      }
+    };
 
     // Always show original legal question as safeguard
     if (useSimplified && f.isSimplified && f.originalLabel) {
@@ -203,6 +295,118 @@ function renderFields() {
   form.appendChild(submitBtn);
 }
 
+// ── Dropzone & Document AI Extraction ──────────────────────────────────────────
+
+function initDropzone() {
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('resume-file');
+  const pasteBtn = document.getElementById('btn-paste-bio');
+  const pasteContainer = document.getElementById('paste-box-container');
+  const cancelPaste = document.getElementById('btn-cancel-paste');
+  const submitPaste = document.getElementById('btn-submit-paste');
+  const pasteInput = document.getElementById('paste-bio-input');
+  const promptView = document.getElementById('dropzone-prompt');
+  const statusView = document.getElementById('upload-status');
+  const statusText = document.getElementById('upload-status-text');
+
+  if (!dropzone || !fileInput) return;
+
+  dropzone.onclick = (e) => {
+    if (e.target.id === 'btn-paste-bio' || e.target.closest('#btn-paste-bio')) return;
+    fileInput.click();
+  };
+
+  dropzone.ondragover = (e) => { e.preventDefault(); dropzone.classList.add('drag-over'); };
+  dropzone.ondragleave = () => dropzone.classList.remove('drag-over');
+  dropzone.ondrop = (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('drag-over');
+    if (e.dataTransfer?.files?.length) handleFile(e.dataTransfer.files[0]);
+  };
+
+  fileInput.onchange = () => {
+    if (fileInput.files?.length) handleFile(fileInput.files[0]);
+  };
+
+  if (pasteBtn && pasteContainer) {
+    pasteBtn.onclick = (e) => {
+      e.stopPropagation();
+      pasteContainer.style.display = 'block';
+      pasteInput.focus();
+    };
+  }
+  if (cancelPaste && pasteContainer) {
+    cancelPaste.onclick = () => { pasteContainer.style.display = 'none'; };
+  }
+  if (submitPaste && pasteInput) {
+    submitPaste.onclick = async () => {
+      const text = pasteInput.value.trim();
+      if (!text) return;
+      pasteContainer.style.display = 'none';
+      await runExtraction({ text });
+    };
+  }
+
+  function handleFile(file) {
+    const isText = file.type.startsWith('text/') || file.name.endsWith('.txt');
+    if (isText) {
+      const reader = new FileReader();
+      reader.onload = async () => { await runExtraction({ text: reader.result }); };
+      reader.readAsText(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = String(reader.result).split(',')[1];
+        await runExtraction({ base64Data, mimeType: file.type || 'application/pdf' });
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  async function runExtraction(payload) {
+    if (promptView) promptView.style.display = 'none';
+    if (statusView) statusView.style.display = 'flex';
+    if (statusText) statusText.textContent = '⚡ Gemini AI reading document & extracting fields...';
+
+    try {
+      const res = await fetch('/api/ai/extract-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, fields })
+      });
+      const data = await res.json();
+      if (!data.ok || !data.answers) throw new Error(data.error || 'No matching details extracted.');
+
+      let filledCount = 0;
+      for (const [k, v] of Object.entries(data.answers)) {
+        if (!v) continue;
+        const el = form.elements.namedItem(k);
+        if (el) {
+          el.value = String(v).trim();
+          el.classList.add('field-sparkle');
+          setTimeout(() => el.classList.remove('field-sparkle'), 1500);
+          filledCount++;
+        }
+      }
+
+      updateProgress();
+      if (statusText) statusText.innerHTML = `✓ AI successfully populated <strong>${filledCount}</strong> fields!`;
+      setTimeout(() => {
+        if (statusView) statusView.style.display = 'none';
+        if (promptView) promptView.style.display = 'flex';
+      }, 3500);
+    } catch (err) {
+      if (statusText) statusText.textContent = '⚠️ ' + err.message;
+      setTimeout(() => {
+        if (statusView) statusView.style.display = 'none';
+        if (promptView) promptView.style.display = 'flex';
+      }, 3000);
+    }
+  }
+}
+
+// ── Smart Validation & Live Feedback ──────────────────────────────────────────
+
 function validateField(f, el, pill) {
   const val = el.value.trim();
   if (!val) {
@@ -235,7 +439,7 @@ function validateField(f, el, pill) {
     const num = parseFloat(val);
     if (!isNaN(num) && num > 0) {
       pill.className = 'validation-pill valid';
-      pill.innerHTML = `✓ Valid income amount: ₹${num.toLocaleString('en-IN')}`;
+      pill.innerHTML = `✓ Valid numeric format: ₹${num.toLocaleString('en-IN')}`;
       return;
     }
   }
@@ -243,7 +447,7 @@ function validateField(f, el, pill) {
   if (key.includes('name') || label.includes('name') || label.includes('member')) {
     if (val.length >= 3) {
       pill.className = 'validation-pill valid';
-      pill.innerHTML = `✓ Name format valid`;
+      pill.innerHTML = `✓ Valid name`;
       return;
     }
   }
@@ -258,58 +462,54 @@ function validateField(f, el, pill) {
   pill.innerHTML = `✓ Ready for submission`;
 }
 
-function startVoiceInput(micBtn, targetInput) {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) return;
+// ── Speech-to-Text Input ──────────────────────────────────────────────────────
 
-  const recognition = new SpeechRecognition();
+function startVoiceInput(button, input) {
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) return;
+
+  const recognition = new SpeechRec();
   recognition.lang = 'en-US';
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
 
-  micBtn.classList.add('listening');
-  micBtn.innerHTML = '🔴';
+  button.classList.add('listening');
+  button.innerHTML = '🔴 Listening...';
 
-  recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript;
-    targetInput.value = transcript;
-    targetInput.dispatchEvent(new Event('input', { bubbles: true }));
-    targetInput.dispatchEvent(new Event('change', { bubbles: true }));
-    updateProgress();
+  recognition.onresult = (e) => {
+    const transcript = e.results[0][0].transcript;
+    input.value = transcript;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  recognition.onspeechend = () => {
+    button.classList.remove('listening');
+    button.innerHTML = '🎙️';
+    recognition.stop();
   };
 
   recognition.onerror = () => {
-    micBtn.classList.remove('listening');
-    micBtn.innerHTML = '🎙️';
-  };
-
-  recognition.onend = () => {
-    micBtn.classList.remove('listening');
-    micBtn.innerHTML = '🎙️';
+    button.classList.remove('listening');
+    button.innerHTML = '🎙️';
   };
 
   recognition.start();
 }
 
-if (toggleBtn) {
-  toggleBtn.addEventListener('click', () => {
-    useSimplified = !useSimplified;
-    toggleBtn.textContent = useSimplified ? '📋 Show Original Legal Labels' : '✨ Show AI Simplified Labels';
-    renderFields();
-  });
-}
+// ── Submit Handling ───────────────────────────────────────────────────────────
 
-form.addEventListener('submit', async (e) => {
+form.onsubmit = async (e) => {
   e.preventDefault();
+  const btn = form.querySelector('.submit-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Encrypting &amp; Relaying Answers...';
+  }
+
   const answers = {};
   for (const f of fields) {
-    const el = form.elements.namedItem(f.key);
-    answers[f.key] = el ? el.value : '';
-  }
-  const button = form.querySelector('button[type="submit"]');
-  if (button) {
-    button.disabled = true;
-    button.textContent = '⏳ Encrypting & Transmitting...';
+    const el = form.elements[f.key];
+    answers[f.key] = el ? el.value.trim() : '';
   }
 
   try {
@@ -318,29 +518,37 @@ form.addEventListener('submit', async (e) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answers })
     });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'Failed to submit answers');
-
-    form.remove();
-    if (toggleBtn) toggleBtn.style.display = 'none';
-    if (progressBar) progressBar.style.width = '100%';
-    if (progressText) progressText.textContent = 'All questions submitted!';
-    if (progressPercent) progressPercent.textContent = '100%';
+    const res = await r.json();
+    if (!r.ok) throw new Error(res.error || 'Submission failed');
 
     status.className = 'status-success';
     status.innerHTML = `
-      <h3>🎉 Answers Transmitted Successfully!</h3>
-      <p style="margin-top:8px; font-size: 0.95rem; line-height: 1.5;">Your answers have been securely relayed back to the applicant's browser. The original form on their device will automatically populate in real time.</p>
-      <div style="margin-top: 14px; font-size: 11px; color: #047857;">🔒 This session has now self-destructed and is locked from further edits.</div>
+      <h3>✓ Answers Relayed Successfully!</h3>
+      <p style="margin-top: 6px; font-size: 0.95rem;">Your answers have been securely injected into the primary registration form in real time.</p>
+      <div style="margin-top: 14px; font-size: 0.8rem; color: #047857; font-weight: 600;">🔒 Session is now locked and protected. You may close this tab.</div>
     `;
-  } catch (e) {
-    status.className = 'status-error';
-    status.textContent = '❌ ' + e.message;
-    if (button) {
-      button.disabled = false;
-      button.textContent = '🔒 Submit Answers Securely';
+    form.style.display = 'none';
+    const aiCard = document.getElementById('ai-autofill-card');
+    if (aiCard) aiCard.style.display = 'none';
+  } catch (err) {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '🔒 Submit Answers Securely';
     }
+    status.className = 'status-error';
+    status.textContent = '❌ Submission error: ' + err.message;
   }
-});
+};
+
+// ── Toggle Legal View ─────────────────────────────────────────────────────────
+
+if (toggleBtn) {
+  toggleBtn.onclick = () => {
+    useSimplified = !useSimplified;
+    toggleBtn.textContent = useSimplified ? '📋 Show Original Legal Labels' : '✨ Show AI-Clarified Labels';
+    renderFields();
+    updateProgress();
+  };
+}
 
 load();

@@ -117,6 +117,16 @@
 
         <!-- Step 3: Group Results List -->
         <div id="ai-results" style="display: none;">
+          <div class="automation-bar">
+            <label class="automation-toggle-label">
+              <input type="checkbox" id="chk-auto-submit">
+              <span>⚡ Auto-Submit form on completion</span>
+            </label>
+            <label class="automation-toggle-label">
+              <input type="checkbox" id="chk-sound" checked>
+              <span>🔔 Chime</span>
+            </label>
+          </div>
           <div id="group-cards-container" style="max-height: 380px; overflow-y: auto; padding-right: 4px;"></div>
           <button id="btn-skip-ai" class="button quiet wide" type="button" style="font-size: 11px; margin-top: 8px;">Switch to manual selection</button>
         </div>

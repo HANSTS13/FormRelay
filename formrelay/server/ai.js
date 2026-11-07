@@ -259,4 +259,159 @@ async function analyzeFormFields(fields) {
   return groupFieldsByPerson(fields);
 }
 
-module.exports = { VALID_CATEGORIES, analyzeFormFields, groupFieldsByPerson, simplifyField, enhanceFieldsWithAI };
+// ── AI Resume & Profile Extraction Engine ──────────────────────────────────────
+
+async function extractProfileData({ text, base64Data, mimeType, fields }) {
+  const apiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+  if (!apiKey) return { ok: false, error: 'GEMINI_API_KEY is not configured on the server.' };
+  if (!Array.isArray(fields) || fields.length === 0) return { ok: false, error: 'No target fields specified.' };
+
+  const targetList = fields.map(f => ({
+    key: f.key,
+    label: f.simplifiedLabel || f.label,
+    type: f.type || 'text'
+  }));
+
+  const parts = [];
+
+  if (base64Data) {
+    parts.push({
+      inlineData: {
+        mimeType: mimeType || 'application/pdf',
+        data: base64Data
+      }
+    });
+  }
+
+  const promptText = `You are a high-accuracy document intelligence AI for FormRelay.
+Analyze the provided document or text and extract the candidate's personal and professional information to populate the following form fields.
+
+Target Fields:
+${JSON.stringify(targetList, null, 2)}
+
+${text ? `Document Text:\n"""\n${text.slice(0, 8000)}\n"""\n` : ''}
+
+Rules:
+1. Map the detected information to the matching field "key".
+2. Format phone numbers cleanly with country code if available.
+3. Format names with proper Title Case.
+4. Extract complete address/college/GitHub/LinkedIn/bio if present.
+5. Return ONLY a valid JSON object mapping each key to its extracted string value:
+{
+  "field_key_1": "Extracted Answer",
+  "field_key_2": "Extracted Answer"
+}`;
+
+  parts.push({ text: promptText });
+
+  const body = {
+    contents: [{ role: 'user', parts }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 0.1
+    }
+  };
+
+  const models = ['gemini-3.1-flash-lite', 'gemini-flash-lite-latest', 'gemini-3.8-flash'];
+  for (const m of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!raw) continue;
+
+      let parsed;
+      try { parsed = JSON.parse(raw); }
+      catch {
+        const match = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (match) parsed = JSON.parse(match[1]);
+      }
+      if (parsed && typeof parsed === 'object') {
+        return { ok: true, model: m, answers: parsed };
+      }
+    } catch {
+      // try next model
+    }
+  }
+
+  return { ok: false, error: 'Failed to extract profile information from document.' };
+}
+
+// ── AI Multilingual Question Explainer ─────────────────────────────────────────
+
+async function explainQuestion({ label, lang = 'en' }) {
+  const apiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+  if (!apiKey) {
+    return { ok: true, explanation: `Please enter the required information for "${label}".` };
+  }
+
+  const prompt = `You are a helpful form assistant. In 1 concise sentence (maximum 25 words), explain simply what the user should enter for this question: "${label}".
+Language requested: ${lang}.
+Do not include quotes or intro text, just the direct helpful explanation.`;
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.2 }
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const explanation = (data?.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
+      if (explanation) return { ok: true, explanation };
+    }
+  } catch {}
+
+  return { ok: true, explanation: `Enter the official details for ${label} as requested.` };
+}
+
+// ── Smart Data Normalizer ─────────────────────────────────────────────────────
+
+function normalizeAnswer(type, val, label = '') {
+  if (typeof val !== 'string') return val;
+  let s = val.trim();
+
+  // Name Title Case
+  if (/name|member|person|student|guardian/i.test(label) && type === 'text') {
+    s = s.replace(/\w\S*/g, txt => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+  }
+
+  // Phone Normalization
+  if (type === 'tel' || /phone|mobile|contact/i.test(label)) {
+    const digits = s.replace(/\D/g, '');
+    if (digits.length === 10 && !s.startsWith('+')) {
+      s = '+91 ' + digits.slice(0, 5) + ' ' + digits.slice(5);
+    }
+  }
+
+  // GitHub / LinkedIn Normalization
+  if (/github/i.test(label) && s && !/^https?:\/\//i.test(s)) {
+    s = 'https://github.com/' + s.replace(/^@/, '');
+  }
+  if (/linkedin/i.test(label) && s && !/^https?:\/\//i.test(s)) {
+    s = 'https://linkedin.com/in/' + s.replace(/^@/, '');
+  }
+
+  return s;
+}
+
+module.exports = {
+  VALID_CATEGORIES,
+  analyzeFormFields,
+  groupFieldsByPerson,
+  simplifyField,
+  enhanceFieldsWithAI,
+  extractProfileData,
+  explainQuestion,
+  normalizeAnswer
+};

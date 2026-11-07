@@ -3,7 +3,13 @@ const crypto = require('crypto');
 const QRCode = require('qrcode');
 const path = require('path');
 const fs = require('fs');
-const { enhanceFieldsWithAI, groupFieldsByPerson } = require('./ai');
+const {
+  enhanceFieldsWithAI,
+  groupFieldsByPerson,
+  extractProfileData,
+  explainQuestion,
+  normalizeAnswer
+} = require('./ai');
 
 // Load .env if present
 const envPath = path.join(__dirname, '.env');
@@ -22,8 +28,8 @@ app.disable('x-powered-by');
 
 // ── SECURITY MIDDLEWARE ───────────────────────────────────────────────────────
 
-// 1. Strict Payload Limit to prevent memory exhaustion DoS
-app.use(express.json({ limit: '32kb', strict: true }));
+// 1. Strict Payload Limit (10mb to allow PDF/Resume base64 parsing)
+app.use(express.json({ limit: '10mb', strict: true }));
 
 // 2. Comprehensive Security Headers & Content Security Policy (CSP)
 app.use((req, res, next) => {
@@ -167,6 +173,32 @@ app.post('/api/ai/group-fields', aiLimiter, async (req, res) => {
   }
 });
 
+// AI Document & Resume Field Extractor ("Upload to Fill")
+app.post('/api/ai/extract-profile', aiLimiter, async (req, res) => {
+  try {
+    const { text, base64Data, mimeType, fields } = req.body || {};
+    if (!text && !base64Data) {
+      return res.status(400).json({ ok: false, error: 'Provide text or uploaded file.' });
+    }
+    const result = await extractProfileData({ text, base64Data, mimeType, fields });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Extraction failed: ' + err.message });
+  }
+});
+
+// AI Question Explainer & Translator
+app.post('/api/ai/explain', aiLimiter, async (req, res) => {
+  try {
+    const { label, lang } = req.body || {};
+    if (!label) return res.status(400).json({ ok: false, error: 'Question label required.' });
+    const result = await explainQuestion({ label, lang });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'Explanation failed: ' + err.message });
+  }
+});
+
 // Create Delegation Request
 app.post('/api/requests', createLimiter, (req, res) => {
   clean();
@@ -270,7 +302,23 @@ app.get('/api/requests/:id/fields', (req, res) => {
   }
 });
 
-// Recipient Answers Submission (Single-submission policy, strict sanitization)
+// Real-Time Progress Beacon from Recipient
+app.post('/api/requests/:id/progress', (req, res) => {
+  const r = findRequest(req, res);
+  if (!r) return;
+  const status = String(req.body?.status || 'active').slice(0, 30);
+  const filledCount = Number(req.body?.filledCount) || 0;
+  const totalCount = Number(req.body?.totalCount) || (r.fields || []).length;
+  r.progress = {
+    status,
+    filledCount,
+    totalCount,
+    updatedAt: Date.now()
+  };
+  res.json({ ok: true });
+});
+
+// Recipient Answers Submission (Single-submission policy, strict sanitization & smart normalization)
 app.post('/api/requests/:id/answer', answerLimiter, (req, res) => {
   const r = findRequest(req, res);
   if (!r) return;
@@ -289,12 +337,14 @@ app.post('/api/requests/:id/answer', answerLimiter, (req, res) => {
     if (typeof rawVal !== 'string') {
       return res.status(400).json({ error: `Missing or invalid answer for "${f.label}".` });
     }
-    // Limit answer length to 1000 characters and sanitize
-    answers[f.key] = sanitizeText(rawVal);
+    // Limit answer length to 1000 characters, sanitize, and run smart normalization
+    const clean = sanitizeText(rawVal);
+    answers[f.key] = normalizeAnswer(f.type, clean, f.simplifiedLabel || f.label);
   }
 
   r.answers = answers;
   r.submittedAt = Date.now();
+  r.progress = { status: 'submitted', filledCount: r.fields.length, totalCount: r.fields.length, updatedAt: Date.now() };
   res.json({ ok: true, message: 'Answers securely stored and ready for real-time autofill.' });
 });
 
@@ -305,7 +355,8 @@ app.get('/api/requests/:id/status', (req, res) => {
   res.json({
     submitted: Boolean(r.answers),
     answers: r.answers,
-    submittedAt: r.submittedAt
+    submittedAt: r.submittedAt,
+    progress: r.progress || null
   });
 });
 

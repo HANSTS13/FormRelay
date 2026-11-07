@@ -936,6 +936,132 @@ input:focus {
   margin-bottom: 8px;
 }
 
+/* Automation & Preferences Bar */
+.automation-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f1f5f9;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+.automation-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.automation-toggle-label input[type="checkbox"] {
+  accent-color: var(--primary);
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+}
+
+/* WhatsApp Button */
+.btn-whatsapp {
+  background: #25d366 !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 2px 6px rgba(37, 211, 102, 0.3) !important;
+  font-weight: 700 !important;
+  transition: all 0.15s ease !important;
+}
+
+.btn-whatsapp:hover {
+  background: #128c7e !important;
+  transform: translateY(-1px);
+}
+
+/* Live Status Badges */
+.status-pill-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.status-pill-live.waiting {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.status-pill-live.opened {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  animation: pulse 1.5s infinite;
+}
+
+.status-pill-live.filling {
+  background: #e0e7ff;
+  color: #3730a3;
+  border: 1px solid #c7d2fe;
+}
+
+.status-pill-live.completed {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+/* Review Answers Card */
+.review-card {
+  margin-top: 10px;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  animation: fadeIn 0.2s ease;
+}
+
+.review-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+.review-table th {
+  text-align: left;
+  padding: 4px 6px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.review-table td {
+  padding: 5px 6px;
+  border-bottom: 1px solid #f1f5f9;
+  color: var(--text-main);
+}
+
+.review-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: inherit;
+  background: #ffffff;
+}
+
+.review-input:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+
 /* Footer Hallmark */
 footer {
   background: #ffffff;

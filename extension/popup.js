@@ -234,34 +234,126 @@ if ($('ai-confirm')) {
   };
 }
 
+// ── Audio Chime & Collaboration Tools ─────────────────────────────────────────
+
+function playChime() {
+  try {
+    const chk = document.getElementById('chk-sound');
+    if (chk && !chk.checked) return;
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.08); // A5
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.35);
+  } catch {}
+}
+
+const activePollers = new Map();
+const createdGroupRequests = [];
+
+function checkAllCompletedAndAutoSubmit() {
+  const autoSubmitChk = document.getElementById('chk-auto-submit');
+  if (!autoSubmitChk || !autoSubmitChk.checked) return;
+  if (!createdGroupRequests.length) return;
+
+  const allDone = createdGroupRequests.every(r => r.completed);
+  if (allDone && !window.__autoSubmitting) {
+    window.__autoSubmitting = true;
+    notify('⚡ All member relays completed! Auto-submitting form in 3s...', 'loading');
+    setTimeout(async () => {
+      const res = await content('AUTO_SUBMIT').catch(() => null);
+      if (res?.submitted) {
+        notify('✓ Form successfully submitted!', 'success');
+      } else {
+        notify('Form inputs ready! Click Submit on page.', 'info');
+      }
+    }, 3000);
+  }
+}
+
 function renderAiGroupCards(groups, origin) {
   const container = $('group-cards-container');
   container.replaceChildren();
+  createdGroupRequests.length = 0;
 
-  // Top action: generate for all groups at once
+  // Top Action Bar
+  const actionWrap = document.createElement('div');
+  actionWrap.style.cssText = 'display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap;';
+
+  // 1. Generate All
   const allBtn = document.createElement('button');
   allBtn.type = 'button';
-  allBtn.className = 'button primary wide';
-  allBtn.style.cssText = 'background: #0d9488; margin-bottom: 12px; font-weight: 700; font-size: 12px; min-height: 36px; box-shadow: 0 2px 6px rgba(13,148,136,0.3);';
-  allBtn.textContent = '⚡ Generate QRs for All Groups (' + groups.length + ')';
+  allBtn.className = 'button primary';
+  allBtn.style.cssText = 'flex: 1; background: #0d9488; font-weight: 700; font-size: 11.5px; min-height: 34px; box-shadow: 0 2px 6px rgba(13,148,136,0.3);';
+  allBtn.textContent = '⚡ Generate All QRs (' + groups.length + ')';
   allBtn.onclick = async () => {
     allBtn.disabled = true;
     allBtn.textContent = '⏳ Generating all QRs...';
     for (let i = 0; i < groups.length; i++) {
       await createQrForGroupCard(groups[i], i, origin);
     }
-    allBtn.textContent = '✓ All ' + groups.length + ' QRs Generated!';
+    allBtn.textContent = '✓ All ' + groups.length + ' QRs Active';
     allBtn.style.background = '#059669';
   };
-  container.appendChild(allBtn);
+  actionWrap.appendChild(allBtn);
+
+  // 2. Share All WhatsApp
+  const shareAllBtn = document.createElement('button');
+  shareAllBtn.type = 'button';
+  shareAllBtn.className = 'button btn-whatsapp';
+  shareAllBtn.style.cssText = 'font-size: 11px; min-height: 34px; padding: 0 10px;';
+  shareAllBtn.title = 'Share all generated links via WhatsApp';
+  shareAllBtn.textContent = '💬 WhatsApp All';
+  shareAllBtn.onclick = () => {
+    if (!createdGroupRequests.length) {
+      notify('Generate the QRs first before sharing!', 'error');
+      return;
+    }
+    const lines = createdGroupRequests.map(r => `• ${r.groupName}: ${r.url}`).join('\n');
+    const msg = encodeURIComponent(`*Team Registration Form Links:*\n${lines}\n\nPlease fill your assigned section!`);
+    window.open(`https://api.whatsapp.com/send?text=${msg}`, '_blank');
+  };
+  actionWrap.appendChild(shareAllBtn);
+
+  // 3. Copy All Links
+  const copyAllBtn = document.createElement('button');
+  copyAllBtn.type = 'button';
+  copyAllBtn.className = 'button secondary';
+  copyAllBtn.style.cssText = 'font-size: 11px; min-height: 34px; padding: 0 10px;';
+  copyAllBtn.textContent = '📋 Copy All';
+  copyAllBtn.onclick = () => {
+    if (!createdGroupRequests.length) {
+      notify('Generate QRs first!', 'error');
+      return;
+    }
+    const lines = createdGroupRequests.map(r => `${r.groupName}: ${r.url}`).join('\n');
+    copyText(lines, copyAllBtn, '📋 Copy All');
+  };
+  actionWrap.appendChild(copyAllBtn);
+
+  container.appendChild(actionWrap);
 
   groups.forEach((g, idx) => {
     const card = document.createElement('div');
     card.className = 'group-card';
+    card.id = 'group-card-' + idx;
 
     const header = document.createElement('div');
     header.className = 'group-card-header';
-    header.innerHTML = '<span class="group-card-title">👥 ' + escapeHtml(g.groupName) + '</span><span class="group-count-tag">' + (g.fields || []).length + ' questions</span>';
+    header.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span class="group-card-title">👥 ${escapeHtml(g.groupName)}</span>
+        <span id="ai-status-pill-${idx}" class="status-pill-live waiting">⏳ Ready</span>
+      </div>
+      <span class="group-count-tag">${(g.fields || []).length} questions</span>
+    `;
 
     const desc = document.createElement('div');
     desc.className = 'group-desc';
@@ -294,10 +386,18 @@ function renderAiGroupCards(groups, origin) {
       <img id="ai-qr-img-${idx}" class="qr-img" alt="QR Code">
       <a id="ai-link-${idx}" target="_blank" class="group-qr-link"></a>
       <div style="display: flex; gap: 6px; margin-bottom: 8px;">
-        <button id="ai-copy-btn-${idx}" type="button" class="button secondary" style="flex: 1; min-height: 30px; font-size: 10.5px;">📋 Copy Link</button>
-        <button id="ai-dl-btn-${idx}" type="button" class="button secondary" style="min-height: 30px; font-size: 10.5px;">💾 Save QR</button>
+        <button id="ai-wa-btn-${idx}" type="button" class="button btn-whatsapp" style="flex: 1; min-height: 30px; font-size: 10.5px;">💬 WhatsApp</button>
+        <button id="ai-copy-btn-${idx}" type="button" class="button secondary" style="flex: 1; min-height: 30px; font-size: 10.5px;">📋 Copy</button>
+        <button id="ai-dl-btn-${idx}" type="button" class="button secondary" style="min-height: 30px; font-size: 10.5px;">💾 Save</button>
       </div>
-      <div style="font-size: 10.5px; color: #059669; font-weight: 600;">✓ Dedicated link ready for ${escapeHtml(g.groupName)}</div>
+      <div id="ai-live-note-${idx}" style="font-size: 10.5px; color: #059669; font-weight: 600;">✓ Dedicated link active. Waiting for teammate...</div>
+      
+      <!-- Review & Edit Answers Container -->
+      <div id="ai-review-container-${idx}" class="review-card" style="display: none;">
+        <div style="font-weight: 700; color: #1e293b; font-size: 11px; margin-bottom: 4px;">📝 Review Answers from ${escapeHtml(g.groupName)}:</div>
+        <table id="ai-review-table-${idx}" class="review-table"></table>
+        <button id="ai-approve-btn-${idx}" type="button" class="button primary wide" style="background: #059669; min-height: 30px; font-size: 11px; margin-top: 6px;">✓ Approve &amp; Autofill Form</button>
+      </div>
     `;
 
     card.append(header, desc, list, createBtn, resultBox);
@@ -312,6 +412,8 @@ async function createQrForGroupCard(g, idx, origin) {
   const linkEl = document.getElementById('ai-link-' + idx);
   const copyBtn = document.getElementById('ai-copy-btn-' + idx);
   const dlBtn = document.getElementById('ai-dl-btn-' + idx);
+  const waBtn = document.getElementById('ai-wa-btn-' + idx);
+  const statusPill = document.getElementById('ai-status-pill-' + idx);
 
   if (btn) {
     btn.disabled = true;
@@ -326,10 +428,23 @@ async function createQrForGroupCard(g, idx, origin) {
     const result = await worker('CREATE_REQUEST', { base });
     const req = result.request;
 
+    createdGroupRequests.push({
+      id: req.id,
+      groupName: g.groupName,
+      url: req.url,
+      fields: g.fields,
+      completed: false
+    });
+
     if (btn) {
       btn.textContent = '✓ ' + g.groupName + ' QR Active';
       btn.style.background = '#059669';
       btn.disabled = false;
+    }
+
+    if (statusPill) {
+      statusPill.className = 'status-pill-live waiting';
+      statusPill.textContent = '⏳ Link Sent';
     }
 
     if (resultBox && qrImg && linkEl) {
@@ -339,15 +454,22 @@ async function createQrForGroupCard(g, idx, origin) {
       linkEl.textContent = req.url;
       
       if (copyBtn) {
-        copyBtn.onclick = () => copyText(req.url, copyBtn, '📋 Copy Link');
+        copyBtn.onclick = () => copyText(req.url, copyBtn, '📋 Copy');
       }
       if (dlBtn) {
         dlBtn.onclick = () => downloadImage(qrUrl, 'formrelay-' + g.groupName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '.png');
+      }
+      if (waBtn) {
+        waBtn.onclick = () => {
+          const msg = encodeURIComponent(`Hi! Please fill your ${g.groupName} details for our form: ${req.url}`);
+          window.open(`https://api.whatsapp.com/send?text=${msg}`, '_blank');
+        };
       }
       resultBox.style.display = 'block';
     }
 
     notify('Generated QR and link for ' + g.groupName + '!');
+    startPollingCard(req, idx, g, base);
   } catch (err) {
     if (btn) {
       btn.disabled = false;
@@ -355,4 +477,102 @@ async function createQrForGroupCard(g, idx, origin) {
     }
     notify('Error: ' + err.message, 'error');
   }
+}
+
+function startPollingCard(req, idx, g, base) {
+  if (activePollers.has(req.id)) clearInterval(activePollers.get(req.id));
+
+  const pollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(`${base}/api/requests/${req.id}/status`, {
+        headers: req.token ? { 'Authorization': 'Bearer ' + req.token } : {}
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const statusPill = document.getElementById('ai-status-pill-' + idx);
+      const liveNote = document.getElementById('ai-live-note-' + idx);
+      const reviewBox = document.getElementById('ai-review-container-' + idx);
+      const reviewTable = document.getElementById('ai-review-table-' + idx);
+      const approveBtn = document.getElementById('ai-approve-btn-' + idx);
+
+      // Handle Live Progress
+      if (data.progress && !data.submitted) {
+        if (data.progress.status === 'opened') {
+          if (statusPill) {
+            statusPill.className = 'status-pill-live opened';
+            statusPill.textContent = '🟡 Opened';
+          }
+          if (liveNote) liveNote.textContent = 'Teammate opened the link on their device.';
+        } else if (data.progress.status === 'typing' || data.progress.status === 'active') {
+          if (statusPill) {
+            statusPill.className = 'status-pill-live filling';
+            statusPill.textContent = `🔵 Filling (${data.progress.filledCount}/${data.progress.totalCount})`;
+          }
+          if (liveNote) liveNote.textContent = `Teammate is entering answers (${data.progress.filledCount}/${data.progress.totalCount} completed)...`;
+        }
+      }
+
+      // Handle Final Submission
+      if (data.submitted && data.answers) {
+        clearInterval(pollInterval);
+        activePollers.delete(req.id);
+        playChime();
+
+        const groupRecord = createdGroupRequests.find(r => r.id === req.id);
+        if (groupRecord) groupRecord.completed = true;
+
+        if (statusPill) {
+          statusPill.className = 'status-pill-live completed';
+          statusPill.textContent = '🟢 ✓ Submitted';
+        }
+        if (liveNote) {
+          liveNote.innerHTML = `<strong>✓ All answers received!</strong> Click Review below to inspect or autofill.`;
+        }
+
+        // Render Review & Edit Table
+        if (reviewBox && reviewTable && approveBtn) {
+          reviewTable.innerHTML = '';
+          const thead = document.createElement('thead');
+          thead.innerHTML = '<tr><th>Question</th><th>Submitted Answer</th></tr>';
+          reviewTable.appendChild(thead);
+
+          const tbody = document.createElement('tbody');
+          for (const f of g.fields) {
+            const tr = document.createElement('tr');
+            const val = data.answers[f.key] || '';
+            tr.innerHTML = `
+              <td style="font-weight: 600; width: 45%;">${escapeHtml(f.label)}</td>
+              <td><input type="text" class="review-input" id="review-input-${idx}-${f.key}" value="${escapeHtml(val)}"></td>
+            `;
+            tbody.appendChild(tr);
+          }
+          reviewTable.appendChild(tbody);
+          reviewBox.style.display = 'block';
+
+          approveBtn.onclick = async () => {
+            approveBtn.disabled = true;
+            approveBtn.textContent = '⏳ Injecting into Form...';
+            // Collect any edited answers
+            const finalAnswers = {};
+            for (const f of g.fields) {
+              const inp = document.getElementById(`review-input-${idx}-${f.key}`);
+              finalAnswers[f.key] = inp ? inp.value.trim() : (data.answers[f.key] || '');
+            }
+            // Trigger autofill on webpage
+            await content('SET_SELECTION', { keys: g.fields.map(f => f.key) });
+            await content('APPLY_MANUAL_ANSWERS', { answers: finalAnswers, requestId: req.id }).catch(() => null);
+            approveBtn.textContent = '✓ Injected into Form!';
+            approveBtn.style.background = '#059669';
+            notify(`Autofilled ${g.groupName} answers into form!`, 'success');
+            checkAllCompletedAndAutoSubmit();
+          };
+        }
+
+        notify(`✓ ${g.groupName} submitted their answers!`, 'success');
+        checkAllCompletedAndAutoSubmit();
+      }
+    } catch {}
+  }, 2500);
+
+  activePollers.set(req.id, pollInterval);
 }

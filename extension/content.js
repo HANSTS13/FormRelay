@@ -448,6 +448,38 @@
         reply({ ok: true, count: chosen.length });
         return;
       }
+      if(msg.action==='APPLY_MANUAL_ANSWERS'){
+        const active = (msg.requestId ? requests.get(msg.requestId) : null) || tracker || { fields: chosen, phase: 'waiting', previous: new Map(), id: msg.requestId || 'manual' };
+        if (msg.answers) {
+          apply(msg.answers, active.fields || chosen, active).then(() => {
+            reply({ ok: true });
+          }).catch(err => {
+            reply({ ok: false, error: err.message });
+          });
+          return;
+        }
+        reply({ ok: false, error: 'No answers provided' });
+        return;
+      }
+      if(msg.action==='AUTO_SUBMIT'){
+        const btn = document.querySelector('form button[type=submit], [role=button][aria-label*="Submit" i], input[type=submit], div[role=button][jsname="M2EdDa"], div[role=button][jsname="OCpkoe"]');
+        if (btn) {
+          btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          btn.click();
+          reply({ ok: true, submitted: true });
+          return;
+        }
+        const allButtons = [...document.querySelectorAll('button, div[role=button], input[type=button]')];
+        const submitBtn = allButtons.find(b => /^(?:submit|send|register|finish|done)$/i.test(b.innerText?.trim() || b.getAttribute('aria-label') || b.value || ''));
+        if (submitBtn) {
+          submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          submitBtn.click();
+          reply({ ok: true, submitted: true });
+          return;
+        }
+        reply({ ok: false, error: 'Could not find form submit button on page' });
+        return;
+      }
       if(msg.action==='CHECK'){reply(compatibility());return}
       if(msg.action==='PREPARE_REQUEST'){
         if(creating||filling)throw Error('Wait for the current operation to finish.');
