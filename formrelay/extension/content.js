@@ -525,10 +525,40 @@
     const restored=response.requests||(response.request?[response.request]:[]);
     if(restored.length){
       let added=false;
-      for(const r of restored){if(requests.has(r.id))continue;added=true;const phase=r.view?.phase||r.phase||'waiting',done=['completed','expired','unauthorized'].includes(phase);tracker={...r,done,phase:done?phase:'waiting',previous:new Map(),fields:r.fields.map(f=>({...f,required:!!f.required,refs:[],el:null,state:done?(phase==='completed'?'verified':'skipped'):'confirmation',detail:'Page navigation or extension update: click to confirm this mapping'}))};requests.set(r.id,tracker)}
+      const candidates=[...document.querySelectorAll(controls)];
+      for(const r of restored){
+        if(requests.has(r.id))continue;
+        added=true;
+        const phase=r.view?.phase||r.phase||'waiting',done=['completed','expired','unauthorized'].includes(phase);
+        const recoveredFields=r.fields.map(f=>{
+          let matchedEl=null,matchedRefs=[];
+          for(const el of candidates){
+            const d=describe(el);
+            if(d.label===f.label||(f.simplifiedLabel&&d.label===f.simplifiedLabel)||(d.name&&d.name===f.name)){
+              matchedEl=canonical(el);
+              matchedRefs=members(matchedEl);
+              break;
+            }
+          }
+          const hasBinding=Boolean(matchedEl);
+          return {
+            ...f,
+            required:!!f.required,
+            refs:matchedRefs,
+            el:matchedEl,
+            state:done?(phase==='completed'?'verified':'skipped'):hasBinding?'selected':'confirmation',
+            detail:hasBinding?'Auto-reconnected from session':'Page reload: click to confirm mapping'
+          };
+        });
+        tracker={...r,done,phase:done?phase:'waiting',previous:new Map(),fields:recoveredFields};
+        requests.set(r.id,tracker);
+        if(tracker.fields.some(f=>f.el)){
+          tracker.fields.filter(f=>f.el).forEach(f=>f.refs.forEach(ref=>paint(ref,'selected')));
+        }
+      }
       if(!added)return;
       tracker=requests.get(response.request?.id)||tracker;
-      status('Requests restored. Confirm mappings before answers can be inserted into replaced controls.');watch();startPolling();idleObserver();
+      status('Requests restored. Watching for collaborator responses.');watch();startPolling();idleObserver();
     }else if(response.notice)status(response.notice);
     publish();
 

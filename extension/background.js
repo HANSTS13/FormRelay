@@ -58,7 +58,18 @@ async function route(msg, sender) {
       const current=await record(id);
       const requests=requestsOf(current);
       if (msg.action==='INIT') {
-        const matching=Object.values(requests).filter(r=>samePage(r,sender.url||sender.tab.url));
+        let matching=Object.values(requests).filter(r=>samePage(r,sender.url||sender.tab.url));
+        if (!matching.length) {
+          try {
+            const localData = await chrome.storage.local.get('formrelay_persisted');
+            const persisted = localData.formrelay_persisted || {};
+            const unexpired = Object.values(persisted).filter(r => samePage(r, sender.url || sender.tab.url) && (!r.expiresAt || r.expiresAt > Date.now()));
+            if (unexpired.length) {
+              matching = unexpired;
+              for (const r of unexpired) requests[r.id] = r;
+            }
+          } catch {}
+        }
         const request=matching.find(r=>r.id===current.request?.id)||matching.at(-1)||null;
         const changed=current.documentToken!==msg.documentToken;
         await save(id,{...current,requests,documentToken:msg.documentToken,documentId:sender.documentId,view:changed?null:current.view});
@@ -80,7 +91,20 @@ async function route(msg, sender) {
   if (!tab?.id) throw Error('The original tab is closed. Open a form and start again.');
   if (msg.action==='GET_TAB_STATE') {
     const stored=await record(tab.id);
-    const matching=Object.values(requestsOf(stored)).filter(r=>samePage(r,tab.url));
+    let matching=Object.values(requestsOf(stored)).filter(r=>samePage(r,tab.url));
+      if (!matching.length) {
+        try {
+          const localData = await chrome.storage.local.get('formrelay_persisted');
+          const persisted = localData.formrelay_persisted || {};
+          const unexpired = Object.values(persisted).filter(r => samePage(r, tab.url) && (!r.expiresAt || r.expiresAt > Date.now()));
+          if (unexpired.length) {
+            matching = unexpired;
+            const reqs = requestsOf(stored);
+            for (const r of unexpired) reqs[r.id] = r;
+            await save(tab.id, { ...stored, requests: reqs });
+          }
+        } catch {}
+      }
     const sameOrigin=matching.length>0;
     return {ok:true,request:publicRequest(matching.at(-1)),requests:matching.map(publicRequest),view:stored.view?.origin===sourceOrigin(tab.url)?stored.view:null,notice:Object.keys(requestsOf(stored)).length&&!sameOrigin?'Request paused on its original page.':''};
   }
@@ -104,6 +128,12 @@ async function route(msg, sender) {
       if(!/^[a-f0-9]{32}$/.test(data.id)||typeof data.ownerToken!=='string')throw Error('Unexpected request response');
       const request={id:data.id,token:data.ownerToken,base,url:data.url,fields:prepared.contextFields||prepared.fields,createdAt:Date.now(),expiresAt:data.expiresAt||Date.now()+(data.expiresInMinutes||30)*60000,sourceOrigin:sourceOrigin(tab.url),sourcePath:new URL(tab.url).pathname,sourceURL:tab.url,documentToken:prepared.documentToken,phase:'waiting'};
       await save(tab.id,{...current,requests:{...requestsOf(current),[request.id]:request},documentToken:prepared.documentToken,request,view:null});
+        try {
+          const localData = await chrome.storage.local.get('formrelay_persisted');
+          const persisted = localData.formrelay_persisted || {};
+          persisted[request.id] = request;
+          await chrome.storage.local.set({ formrelay_persisted: persisted });
+        } catch {}
       const delivered=await chrome.tabs.sendMessage(tab.id,{action:'TRACK',documentToken:prepared.documentToken,track:request}).catch(()=>null);
       return {ok:true,request:publicRequest(request),notice:delivered?.ok?'':'Request saved. Reopen FormRelay on the original site to confirm its mappings.'};
     } catch(error) {
